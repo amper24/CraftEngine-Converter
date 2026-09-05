@@ -1,0 +1,28 @@
+{
+  "domain": "loot",
+  "version": "26.8",
+  "description": "Loot is a separate layer for block/furniture drops. Preserve source loot table structure; full vanilla-style loot DSL as-is.",
+  "source": "https://github.com/Xiao-MoMi/craft-engine/blob/main/core/src/main/java/net/momirealms/craftengine/core/loot/",
+  "top_level": [{ "path": "<loot_id>", "type": "mapping", "required": true }],
+  "known_entry_keys": ["pools", "type", "rolls", "bonus_rolls", "entries", "conditions", "functions"],
+  "known_loot_entry_types": [
+    "alternatives",
+    "if_else",
+    "item",
+    "exp",
+    "furniture_item",
+    "empty",
+    "function",
+    "loot_table"
+  ],
+  "known_loot_function_types": [
+    "apply_bonus",
+    "apply_data",
+    "set_count",
+    "explosion_decay",
+    "drop_exp",
+    "limit_count"
+  ],
+  "drop_loot_function": "drop_loot event function can force-execute a loot table with to_inventory option.",
+  "note": "CE's loot entry registry is LootEntryContainers (alternatives, if_else, item, exp, furniture_item, empty, function, loot_table). Its loot function registry has six native functions: apply_bonus, apply_data, set_count, explosion_decay, drop_exp and limit_count. Other vanilla datapack entries/functions are not inventable; the generator maps well-known equivalents or reports them as manual tasks."
+}

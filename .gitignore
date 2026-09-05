@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Generated output
+converted/
+tests/farmersdelight_fixture.jar
+
+# PyInstaller build output
+build/
+dist/
+*.spec.bak
+
+# OS
+Thumbs.db
+.DS_Store

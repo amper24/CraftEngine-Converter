@@ -1,0 +1,23 @@
+{
+  "domain": "furniture",
+  "version": "26.8",
+  "description": "Furniture top-level anatomy. Only variants is mandatory.",
+  "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/furniture/",
+  "top_level": [
+    { "path": "<furniture_id>", "type": "mapping", "required": true }
+  ],
+  "furniture_nodes": [
+    { "path": "variants", "type": "mapping", "required": true, "description": "Visual elements, hitboxes, optional seats and transforms." },
+    { "path": "settings", "type": "mapping", "required": false, "description": "item, hit_times, sounds.break/place/hit." },
+    { "path": "behaviors", "type": "list", "required": false },
+    { "path": "loot", "type": "mapping", "required": false },
+    { "path": "events", "type": "list", "required": false }
+  ],
+  "settings_known": {
+    "item": "namespace:id (creative middle-click)",
+    "hit_times": "int",
+    "sounds": { "break": "...", "place": "...", "hit": "..." }
+  },
+  "bind_note": "furniture_item is an Item Behavior that points to furniture by id or embeds inline furniture definition.",
+  "entity_detection": "Furniture is entity-based decoration using display entities."
+}

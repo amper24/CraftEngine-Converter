@@ -1,0 +1,17 @@
+{
+  "domain": "recipe_types",
+  "description": "Maps datapack/various recipe type keys to action. Only shapeless_transform is confirmed target syntax; others preserved.",
+  "source_shapeless_keys": [
+    "minecraft:crafting_shapeless",
+    "minecraft:crafting_shaped",
+    "minecraft:smelting",
+    "minecraft:blasting",
+    "minecraft:smoking",
+    "minecraft:campfire_cooking",
+    "minecraft:stonecutting",
+    "minecraft:smithing_transform",
+    "minecraft:smithing_trim"
+  ],
+  "craftengine_confirmed": ["shapeless_transform"],
+  "note": "Recipes that desugar to shapeless craft with a single result can be emitted as shapeless_transform; all others are preserved in IR/source-map and reported PARTIAL/UNSUPPORTED rather than dropped."
+}

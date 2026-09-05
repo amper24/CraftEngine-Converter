@@ -1,0 +1,44 @@
+{
+  "domain": "block_states",
+  "version": "26.8",
+  "description": "Block state property types and variant matching rules. Property types are the exact ids registered by Properties.java in CraftEngine 26.8 — no `custom_enum`/`half` types exist.",
+  "source": "https://github.com/Xiao-MoMi/craft-engine/blob/main/core/src/main/java/net/momirealms/craftengine/core/block/property/Properties.java",
+  "property_types": {
+    "boolean": { "values": ["true", "false"], "count": 2 },
+    "int": { "range": "min~max", "count": "max-min+1", "example": { "type": "int", "default": 7, "range": "1~7" } },
+    "string": { "required_fields": ["values"], "count": "len(values)", "example": { "type": "string", "default": "x", "values": ["x", "y", "z"] } },
+    "axis": { "values": ["x", "y", "z"], "count": 3 },
+    "horizontal_direction": { "values": ["north", "south", "west", "east"], "count": 4 },
+    "4-direction": { "values": ["north", "south", "west", "east"], "count": 4 },
+    "direction": { "values": ["north", "south", "west", "east", "up", "down"], "count": 6 },
+    "6-direction": { "values": ["north", "south", "west", "east", "up", "down"], "count": 6 },
+    "single_block_half": { "values": ["top", "bottom"], "count": 2 },
+    "double_block_half": { "values": ["upper", "lower"], "count": 2 },
+    "hinge": { "values": ["left", "right"], "count": 2 },
+    "stairs_shape": { "values": ["straight", "inner_left", "inner_right", "outer_left", "outer_right"], "count": 5 },
+    "slab_type": { "values": ["top", "bottom", "double"], "count": 3 },
+    "sofa_shape": { "values": ["straight", "inner_left", "inner_right", "outer_left", "outer_right"], "count": 5 },
+    "anchor_type": { "values": ["ceiling", "floor", "wall"], "count": 3 },
+    "bed_part": { "values": ["head", "foot"], "count": 2 }
+  },
+  "reserved_property_names": {
+    "axis": "automatic axis alignment on placement",
+    "facing": "automatic placement direction",
+    "facing_clockwise": "horizontal direction with rotation",
+    "rotation": "exact rotation (0..7 or 0..15)",
+    "waterlogged": "water state"
+  },
+  "variant_rules": {
+    "separator": ",",
+    "format": "property=value",
+    "wildcard": "unlisted properties act as wildcards",
+    "overlap": "later matching variant overrides settings values while preserving other merged values",
+    "property_order_irrelevant": true,
+    "appearance_fallback": "first appearance used as default fallback"
+  },
+  "property_definition_example": {
+    "waterlogged": { "type": "boolean", "default": false },
+    "facing": { "type": "horizontal_direction", "default": "north" },
+    "age": { "type": "int", "default": 0, "range": "0~7" }
+  }
+}

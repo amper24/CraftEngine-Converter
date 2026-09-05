@@ -1,0 +1,47 @@
+"""Shared enums and constants used across the converter.
+
+These mirror the capability classification from the technical spec.
+"""
+
+from __future__ import annotations
+
+# Mapping capability levels (TZ §16.1)
+DIRECT = "DIRECT"
+TRANSFORM = "TRANSFORM"
+PARTIAL = "PARTIAL"
+SCRIPT = "SCRIPT"
+EXTENSION = "EXTENSION"
+MANUAL = "MANUAL"
+UNSUPPORTED = "UNSUPPORTED"
+
+CAPABILITY_LEVELS = (DIRECT, TRANSFORM, PARTIAL, SCRIPT, EXTENSION, MANUAL, UNSUPPORTED)
+
+# IR node statuses (TZ §8.1)
+DETECTED = "DETECTED"
+ANALYZED = "ANALYZED"
+MAPPED = "MAPPED"
+GENERATED = "GENERATED"
+VALIDATED = "VALIDATED"
+ERROR = "ERROR"
+
+IR_STATUSES = (DETECTED, ANALYZED, MAPPED, GENERATED, VALIDATED, PARTIAL, MANUAL, UNSUPPORTED, ERROR)
+
+# Content domains
+DOMAIN_ITEM = "item"
+DOMAIN_BLOCK = "block"
+DOMAIN_FURNITURE = "furniture"
+DOMAIN_RECIPE = "recipe"
+DOMAIN_LOOT = "loot"
+DOMAIN_RESOURCE = "resource"
+DOMAIN_TAG = "tag"
+DOMAIN_LANG = "lang"
+DOMAIN_SLICEBOARD = "sliceboard"
+
+DOMAINS = (DOMAIN_ITEM, DOMAIN_BLOCK, DOMAIN_FURNITURE, DOMAIN_RECIPE, DOMAIN_LOOT, DOMAIN_RESOURCE, DOMAIN_SLICEBOARD)
+
+# Loader kinds
+LOADER_FORGE = "forge"
+LOADER_NEOFORGE = "neoforge"
+LOADER_FABRIC = "fabric"
+LOADER_QUILT = "quilt"
+LOADER_UNKNOWN = "unknown"

@@ -1,0 +1,23 @@
+{
+  "domain": "tool_tiers",
+  "description": "Vanilla tool material -> break_power (CraftEngine).",
+  "mappings": {
+    "wood": 1,
+    "gold": 1,
+    "stone": 2,
+    "copper": 2,
+    "iron": 3,
+    "diamond": 4,
+    "netherite": 5
+  },
+  "tier_keywords": {
+    "wooden": "wood",
+    "golden": "gold",
+    "stone": "stone",
+    "copper": "copper",
+    "iron": "iron",
+    "diamond": "diamond",
+    "netherite": "netherite"
+  },
+  "default_break_power": 0
+}

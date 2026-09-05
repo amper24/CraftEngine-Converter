@@ -1,0 +1,34 @@
+{
+  "domain": "items",
+  "version": "26.8",
+  "description": "Item top-level anatomy. Independent layers: material, data, model, behavior, settings, events.",
+  "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/item/",
+  "top_level": [
+    {
+      "path": "<item_id>",
+      "type": "mapping",
+      "required": true,
+      "description": "Each custom item is one ID under items:."
+    }
+  ],
+  "item_nodes": [
+    { "path": "material", "type": "string", "required": false, "description": "Base material. Optional; default configurable in config.yml." },
+    { "path": "data", "type": "mapping", "required": false, "description": "Data-component layer." },
+    { "path": "model", "type": "mapping|string", "required": false, "description": "Item model tree." },
+    { "path": "behavior", "type": "mapping", "required": false, "description": "Single item behavior." },
+    { "path": "behaviors", "type": "list", "required": false, "description": "Composite item behaviors." },
+    { "path": "settings", "type": "mapping", "required": false, "description": "Plugin-driven item settings." },
+    { "path": "events", "type": "list", "required": false, "description": "Event entries DSL." },
+    { "path": "custom_model_data", "type": "int", "required": false, "description": "Root-level model binding." },
+    { "path": "item_model", "type": "string", "required": false, "description": "Root-level direct model path." },
+    { "path": "hand_animation_on_swap", "type": "bool", "required": false, "default": true },
+    { "path": "oversized_in_gui", "type": "bool", "required": false, "default": true },
+    { "path": "swap_animation_scale", "type": "float", "required": false, "default": 1.0 },
+    { "path": "texture", "type": "string", "required": false, "description": "Simplified single texture." },
+    { "path": "textures", "type": "list", "required": false, "description": "Simplified textures list." },
+    { "path": "models", "type": "list", "required": false, "description": "Simplified model list." },
+    { "path": "legacy_model", "type": "string", "required": false, "description": "Pre-1.21.4 legacy model (not recommended)." },
+    { "path": "client_bound_material", "type": "string", "required": false, "description": "Client-side material (Premium)." },
+    { "path": "client_bound_data", "type": "mapping", "required": false, "description": "Per-client display data (Premium)." }
+  ]
+}

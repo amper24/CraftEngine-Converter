@@ -1,0 +1,45 @@
+{
+  "domain": "item_models",
+  "version": "26.8",
+  "description": "Item model tree (1.21.4+). Root-level vs data-level custom_model_data/item_model semantics.",
+  "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/item/models/",
+  "root_fields": [
+    { "name": "custom_model_data", "type": "int", "description": "Root-level model binding value." },
+    { "name": "item_model", "type": "string", "description": "Root-level direct model path for 1.21.2+." },
+    { "name": "hand_animation_on_swap", "type": "bool", "default": true },
+    { "name": "oversized_in_gui", "type": "bool", "default": true },
+    { "name": "swap_animation_scale", "type": "float", "default": 1.0 }
+  ],
+  "model_node_types": [
+    { "type": "minecraft:model", "fields": ["path"] },
+    { "type": "minecraft:composite", "fields": ["models"] },
+    { "type": "minecraft:condition", "fields": ["property", "on_true", "on_false", "transformation?"] },
+    { "type": "minecraft:select", "fields": ["property", "cases", "fallback?", "transformation?"] },
+    { "type": "minecraft:range_dispatch", "fields": ["property", "scale", "entries", "fallback?"] },
+    { "type": "minecraft:special", "fields": [] },
+    { "type": "minecraft:empty", "fields": [] },
+    { "type": "minecraft:bundle/selected_item", "fields": [] }
+  ],
+  "condition_properties": [
+    "minecraft:broken", "minecraft:carried", "minecraft:damaged", "minecraft:extended_view",
+    "minecraft:fishing_rod/cast", "minecraft:selected", "minecraft:using_item", "minecraft:view_entity",
+    "minecraft:bundle/has_selected_item", "minecraft:component", "minecraft:has_component",
+    "minecraft:keybind_down", "minecraft:custom_model_data"
+  ],
+  "transformation_order": "right_rotation -> scale -> left_rotation -> translation",
+  "simplified_model_generation": {
+    "texture": "single texture",
+    "textures": "list of textures",
+    "model": "single model",
+    "models": "list of models",
+    "blueprint": "experimental .bbmodel"
+  },
+  "block_model_texture_rules": {
+    "1": "cube_all",
+    "2": "cube_column",
+    "3": "cube_bottom_top",
+    "4": "orientable",
+    "5+": "block/cube style generation"
+  },
+  "note": "data.custom_model_data sets a component value only; root custom_model_data participates in model binding. Same distinction applies to item_model."
+}

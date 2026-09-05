@@ -1,0 +1,32 @@
+{
+  "domain": "item_behaviors",
+  "version": "26.8",
+  "description": "Canonical item behavior types registered by BukkitItemBehaviors in CraftEngine 26.8.",
+  "source": "https://github.com/Xiao-MoMi/craft-engine/blob/main/bukkit/src/main/java/net/momirealms/craftengine/bukkit/item/behavior/BukkitItemBehaviors.java",
+  "known_behavior_types": [
+    "empty",
+    "block_item",
+    "liquid_collision_block_item",
+    "furniture_item",
+    "liquid_collision_furniture_item",
+    "flint_and_steel_item",
+    "compostable_item",
+    "double_high_block_item",
+    "wall_block_item",
+    "ceiling_block_item",
+    "ground_block_item",
+    "multi_high_block_item",
+    "range_mining_item"
+  ],
+  "behavior_dependencies": {
+    "block_item": { "block": "string|inline block config" },
+    "liquid_collision_block_item": { "block": "string|inline block config" },
+    "furniture_item": { "furniture": "string|inline furniture config" },
+    "flint_and_steel_item": { "note": "Makes the item behave like a flint and steel." },
+    "compostable_item": { "chance": "float", "note": "Makes the item compostable with a given probability." },
+    "range_mining_item": { "note": "Makes the item mine blocks in a range." }
+  },
+  "block_item_bind_note": "block_item is the canonical item -> placeable block mechanism.",
+  "placement_variants": ["block_item", "ceiling_block_item", "wall_block_item", "ground_block_item", "double_high_block_item", "multi_high_block_item", "liquid_collision_block_item"],
+  "composite_allowed": true
+}
