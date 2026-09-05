@@ -71,6 +71,7 @@ class Packager:
     def build(self) -> PackageResult:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         ownership = self._write_craftengine_files()
+        self._write_pack_metadata()
         self._write_category_lang_resources()
         self._write_resourcepack()
         self._write_source_map(ownership)
@@ -97,6 +98,33 @@ class Packager:
         return result
 
     # --- craftengine files -------------------------------------------------
+    def _write_pack_metadata(self) -> None:
+        """Write the CraftEngine ``pack.yml`` at the pack root.
+
+        CraftEngine discovers packs by iterating the directories under its
+        resources folder and reading ``pack.yml`` for the namespace/author/
+        version/description metadata. Without it the output directory can be
+        loaded only with the folder-name default namespace and with empty
+        metadata, so this file is generated for every conversion.
+        """
+        meta = self.analysis.metadata
+        namespace = meta.namespace or "minecraft"
+        payload = {
+            "enable": True,
+            "namespace": namespace,
+            "author": (meta.name or "unknown"),
+            "version": (meta.version or self.generator_version),
+            "description": "Converted from %s (%s) by CraftEngine Mod Converter" % (
+                meta.id or namespace,
+                meta.loader or "unknown",
+            ),
+        }
+        (self.output_dir / "pack.yml").write_text(
+            generator.dump_yaml(payload),
+            encoding="utf-8",
+            newline="\n",
+        )
+
     def _write_craftengine_files(self) -> list[OwnershipEntry]:
         ownership: list[OwnershipEntry] = []
         if self.layout == "single":

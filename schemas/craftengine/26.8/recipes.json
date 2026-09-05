@@ -1,10 +1,27 @@
 {
   "domain": "recipes",
   "version": "26.8",
-  "description": "Recipe top-level contract. Only confirmed recipe type is shapeless_transform; other types require target Recipe page.",
-  "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/recipe/",
+  "description": "Recipe top-level contract and native serializers verified against RecipeSerializers.java in CraftEngine 26.8.",
+  "source": "https://github.com/Xiao-MoMi/craft-engine/blob/main/core/src/main/java/net/momirealms/craftengine/core/item/recipe/RecipeSerializers.java",
   "top_level": [{ "path": "recipes", "type": "mapping", "required": true, "description": "Recipe entries keyed by id." }],
-  "confirmed_types": ["shapeless", "shapeless_transform", "shaped"],
+  "confirmed_types": [
+    "shaped",
+    "shaped_transform",
+    "shapeless",
+    "shapeless_transform",
+    "crafting_shaped",
+    "crafting_shapeless",
+    "dye",
+    "crafting_dye",
+    "smelting",
+    "blasting",
+    "smoking",
+    "campfire_cooking",
+    "stonecutting",
+    "smithing_transform",
+    "smithing_trim",
+    "brewing"
+  ],
   "confirmed_example": {
     "default:sharpness_upgrade": {
       "type": "shapeless_transform",
@@ -21,6 +38,6 @@
       "unlock-on-join": { "all": false, "list": ["default:amethyst_torch"] }
     }
   },
-  "note": "For exact recipe types, ingredient schema, processors and premium-only fields, use the target version Recipe page. Unknown source serializers must be preserved in IR and reported as UNSUPPORTED rather than silently generated.",
+  "note": "Ingredient accepts a scalar item id, a tag (#namespace:tag), or a map {items, count, predicate}. Shaped recipes use `pattern` plus an `ingredients` mapping of single-char symbols. Unknown source serializers must be preserved in IR and reported as UNSUPPORTED rather than silently generated.",
   "reload": "/ce reload recipe"
 }

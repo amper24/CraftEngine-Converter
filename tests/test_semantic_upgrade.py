@@ -43,6 +43,8 @@ def test_crop_stage_renderers_reference_existing_helpers():
         doc=yaml.safe_load(gf.content)
         appearances=(doc["blocks"][block_id]["states"]["appearances"])
         for age in block.metadata.get("stage_models", {}):
-            item_id=f"{block.namespace}:{block.id.split(":")[-1][:-5] if block.id.split(":")[-1].endswith("_crop") else block.id.split(":")[-1]}_stage{age}"
+            base = block.id.split(":")[-1]
+            base = base[:-5] if base.endswith("_crop") else base
+            item_id=f"{block.namespace}:{base}_stage{age}"
             assert any(v.get("entity_renderer",{}).get("item") == item_id for v in appearances.values())
             assert item_id in files

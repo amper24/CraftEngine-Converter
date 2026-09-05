@@ -103,9 +103,16 @@ class ModDetector:
         meta.name = str(data.get("name") or data.get("id") or "")
         meta.version = str(data.get("version") or "")
         if isinstance(data.get("depends"), dict):
-            meta.dependencies = sorted(data["depends"].keys())
+            deps = data["depends"]
+            meta.dependencies = sorted(str(k) for k in deps.keys() if str(k) not in {"fabricloader", "fabric-api", "minecraft"})
+            meta.optional_dependencies = sorted(str(k) for k in deps.keys() if str(k) in {"fabricloader", "fabric-api"})
+            mc = deps.get("minecraft")
+            if isinstance(mc, str) and mc:
+                meta.minecraft_versions.append(mc)
         if isinstance(data.get("suggests"), dict):
-            meta.optional_dependencies = sorted(data["suggests"].keys())
+            meta.optional_dependencies.extend(sorted(str(k) for k in data["suggests"].keys()))
+        meta.optional_dependencies = sorted(set(meta.optional_dependencies))
+        meta.dependencies = sorted(set(meta.dependencies))
         return meta
 
     def _parse_quilt(self, data: dict[str, Any]) -> ModMetadata:
@@ -115,10 +122,27 @@ class ModDetector:
         meta.name = str(qm.get("metadata", {}).get("name", "") or meta.id)
         meta.version = str(qm.get("version") or "")
         if isinstance(qm.get("depends"), list):
-            meta.dependencies = sorted(str(d.get("id", "")) for d in qm["depends"] if d.get("id"))
+            for d in qm["depends"]:
+                if isinstance(d, dict) and d.get("id"):
+                    dep = str(d["id"])
+                    if dep in {"minecraft"} and isinstance(d.get("versions"), str):
+                        meta.minecraft_versions.append(d["versions"])
+                    if dep in {"quilt_loader", "quilted_fabric_api"}:
+                        meta.optional_dependencies.append(dep)
+                    else:
+                        meta.dependencies.append(dep)
+        meta.dependencies = sorted(set(meta.dependencies))
+        meta.optional_dependencies = sorted(set(meta.optional_dependencies))
         return meta
 
     def _parse_forge_toml(self, text: str) -> ModMetadata:
+        """Parse Forge/NeoForge ``mods.toml`` / ``neoforge.mods.toml`` metadata.
+
+        Forge TOML is structured as a list of [[mods]] tables followed by a list
+        of [[dependencies.<modId>]] tables.  Dependency properties (modId, type,
+        versionRange, mandatory) may be spread over several lines, so we parse
+        table-by-table instead of trusting a single "mandatory=true" line.
+        """
         meta = ModMetadata()
         mod_id = self._first_match(text, r"modId\s*=\s*\"([^\"]+)\"")
         display = self._first_match(text, r"displayName\s*=\s*\"([^\"]+)\"")
@@ -127,24 +151,57 @@ class ModDetector:
         meta.name = display or mod_id or ""
         meta.version = version or ""
 
-        deps_section = False
-        for line in text.splitlines():
-            stripped = line.strip()
-            if "[[" in stripped and "dependencies" in stripped:
-                deps_section = True
-            elif stripped.startswith("[") and deps_section:
-                deps_section = False
-            if deps_section:
-                m = re.search(r"modId\s*=\s*\"([^\"]+)\"", line)
-                if m:
-                    dep = m.group(1)
-                    if "mandatory=true" in line or "mandatory = true" in line:
-                        meta.dependencies.append(dep)
-                    else:
-                        meta.optional_dependencies.append(dep)
+        # Collect minecraft version ranges from the primary mod's dependencies.
+        mc_ranges: list[str] = []
+        lines = text.splitlines()
 
-        meta.dependencies = sorted(set(meta.dependencies))
+        def flush_dep(meta_: ModMetadata, props: dict[str, str]) -> None:
+            dep_id = props.get("modId", "")
+            if not dep_id:
+                return
+            dep_type = props.get("type", "required").strip().lower()
+            mandatory = "true" in str(props.get("mandatory", dep_type == "required")).lower()
+            if dep_id == "minecraft":
+                vr = props.get("versionRange", "")
+                if vr and vr not in mc_ranges:
+                    mc_ranges.append(vr)
+            if dep_type in ("required", "hard") or mandatory:
+                meta_.dependencies.append(dep_id)
+            else:
+                meta_.optional_dependencies.append(dep_id)
+
+        # Parse dependency tables [[dependencies.<owner>]].  A new table header
+        # at column 0 starts or ends the currently-tracked block.
+        in_dep_table = False
+        current: dict[str, str] = {}
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("[[") and stripped.endswith("]]"):
+                # A new table header automatically closes the previous one.
+                if in_dep_table and current:
+                    flush_dep(meta, current)
+                    current = {}
+                in_dep_table = "dependencies." in stripped
+                if not in_dep_table:
+                    current = {}
+                continue
+            if stripped.startswith("[") and stripped.endswith("]"):
+                if in_dep_table and current:
+                    flush_dep(meta, current)
+                    current = {}
+                in_dep_table = False
+                continue
+            if in_dep_table and "=" in stripped and not stripped.startswith("#"):
+                key, _, value = stripped.partition("=")
+                current[key.strip()] = value.strip().strip('"').strip("'")
+        # Flush a trailing dependency table.
+        if current:
+            flush_dep(meta, current)
+
+        meta.dependencies = sorted(set(d for d in meta.dependencies if d not in {"forge", "neoforge", "fabricloader", "quilt_loader"}))
         meta.optional_dependencies = sorted(set(meta.optional_dependencies))
+        if mc_ranges:
+            meta.minecraft_versions = sorted(set(mc_ranges))
         return meta
 
     @staticmethod

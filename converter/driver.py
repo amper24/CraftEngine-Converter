@@ -151,7 +151,7 @@ class ConversionDriver:
 def convert(
     input_path: str | Path,
     output_dir: str | Path,
-    target: str = "craftengine:26.8.2",
+    target: str = "craftengine:26.8",
     minecraft_version: str = "1.21.4",
     verbose: bool = False,
     settings: Settings | None = None,

@@ -675,8 +675,22 @@ def _property_def(state: BlockStateNode) -> dict[str, Any]:
             entry["range"] = f"{vals[0]}~{vals[0]}"
     elif ptype == "boolean":
         entry["default"] = (state.default_value or "false").lower() in ("true", "1")
+    elif ptype == "string":
+        # CraftEngine's StringProperty requires an explicit values list.
+        values = list(state.allowed_values) if state.allowed_values else [state.default_value or ""]
+        entry["values"] = values
+        entry["default"] = state.default_value or (values[0] if values else "")
     else:
-        entry["default"] = state.default_value or (state.allowed_values[0] if state.allowed_values else "")
+        # Enum-backed CraftEngine property types (axis, direction,
+        # horizontal_direction, hinge, stairs_shape, ...) accept an optional
+        # values list that narrows the allowed state set to the source values.
+        if state.allowed_values:
+            # Direction & alignment types use enum name values already
+            # compatible with CraftEngine; keeping the source list is safe.
+            entry["values"] = list(state.allowed_values)
+        default = state.default_value or (state.allowed_values[0] if state.allowed_values else "")
+        if default:
+            entry["default"] = default
     return entry
 
 

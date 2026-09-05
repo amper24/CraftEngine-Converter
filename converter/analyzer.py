@@ -763,13 +763,33 @@ class Analyzer:
         loc = self._normalize_resource_location(model, ns)
         return loc
 
+    # Registered CraftEngine 26.8 property type ids (from Properties.java).  Any
+    # source property that cannot be represented by one of them is emitted as a
+    # `string` property with an explicit `values` list instead of inventing an
+    # unknown union/enum type which CraftEngine would reject at load time.
+    VALID_PROPERTY_TYPES = {
+        "boolean", "int", "string", "axis", "horizontal_direction", "4-direction",
+        "direction", "6-direction", "single_block_half", "double_block_half",
+        "hinge", "stairs_shape", "slab_type", "sofa_shape", "anchor_type",
+        "bed_part",
+    }
+
     def _infer_property_type(self, pname: str, values: Iterable[str]) -> str:
-        if pname in self.property_types:
+        vals = [str(v) for v in values]
+        # Vanilla `half` is ambiguous: doors/tall plants use upper/lower
+        # (double_block_half) while trapdoors use top/bottom
+        # (single_block_half). Always resolve it from the observed values.
+        if pname == "half":
+            if set(vals) <= {"top", "bottom"}:
+                return "single_block_half"
+            if set(vals) <= {"upper", "lower"}:
+                return "double_block_half"
+            return "string"
+        if pname in self.property_types and self.property_types[pname] in self.VALID_PROPERTY_TYPES:
             return self.property_types[pname]
-        vals = list(values)
         if all(v in ("true", "false") for v in vals):
             return "boolean"
-        if all(str(v).lstrip("-").isdigit() for v in vals):
+        if all(v.lstrip("-").isdigit() for v in vals):
             return "int"
         if set(vals) <= {"x", "y", "z"}:
             return "axis"
@@ -777,11 +797,19 @@ class Analyzer:
             return "horizontal_direction"
         if set(vals) <= {"north", "south", "east", "west", "up", "down"}:
             return "direction"
-        if set(vals) <= {"top", "bottom"}:
-            return "half"
         if set(vals) <= {"left", "right"}:
             return "hinge"
-        return "custom_enum"
+        if set(vals) <= {"head", "foot"}:
+            return "bed_part"
+        if set(vals) <= {"ceiling", "floor", "wall"}:
+            return "anchor_type"
+        if set(vals) <= {"top", "bottom", "double"}:
+            return "slab_type"
+        if set(vals) <= {"straight", "inner_left", "inner_right", "outer_left", "outer_right"}:
+            return "stairs_shape"
+        if set(vals) <= {"north", "east", "south", "west", "up", "down", "none"}:
+            return "direction"
+        return "string"
 
     def _property_default(self, pname: str, values: list[str], variants: list[dict[str, Any]]) -> str | None:
         if variants:
