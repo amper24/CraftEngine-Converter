@@ -103,6 +103,20 @@ class Settings:
     # Output layout: "split" = one file per object grouped in category folders
     # (items/blocks/recipes/crops/food/...); "single" = everything in one file.
     output_layout: str = "split"
+    # --- micro neural network ("brain") ---
+    # Classifies every detected object (what it is, which block representation
+    # it needs) and emits in-game check commands into the reports.
+    brain_enabled: bool = True
+    # Minimum softmax confidence before a prediction is applied to the IR.
+    brain_min_confidence: float = 0.6
+    brain_block_min_confidence: float = 0.7
+    # Log one line per classified object during conversion.
+    brain_log_every_object: bool = True
+    # Let the brain assign a category when tags/recipe hints are absent.
+    brain_categories: bool = True
+    # Let the brain mark food candidates missed by the keyword list.
+    brain_food_detection: bool = True
+
     # --- automatic bytecode semantic reconstruction ---
     bytecode_semantic_enabled: bool = True
     gear_enabled: bool = True

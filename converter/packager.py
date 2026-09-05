@@ -354,9 +354,53 @@ class Packager:
         (reports / "validation.md").write_text(self._validation_md(), encoding="utf-8", newline="\n")
         (reports / "warnings.md").write_text("# Warnings\n\n" + "\n".join(f"- {w}" for w in self.analysis.warnings), encoding="utf-8", newline="\n")
 
+        (reports / "semantics.md").write_text(self._semantics_md(), encoding="utf-8", newline="\n")
+
         coverage = self._coverage_report()
         util.write_json(reports / "coverage.json", coverage)
         (reports / "coverage.md").write_text(self._coverage_md(coverage), encoding="utf-8", newline="\n")
+
+    def _semantics_md(self) -> str:
+        """Human-readable neural classification report.
+
+        Answers, per object: what the network thinks it is, how confident it
+        is, what it changed in the conversion, and which in-game commands
+        verify the result.
+        """
+        semantic = getattr(self.analysis, "semantics", None)
+        lines = ["# Нейросемантическая классификация", ""]
+        if semantic is None or not getattr(semantic, "enabled", False):
+            reason = getattr(semantic, "reason", "") or "недоступно"
+            lines.append(f"Микро-нейросеть не использовалась: {reason}.")
+            lines.append("")
+            lines.append("Конвертация выполнена на эвристиках по именам и тегам.")
+            return "\n".join(lines)
+
+        counts = semantic.counts()
+        lines.append(f"Классифицировано объектов: **{len(semantic.records)}**")
+        lines.append("")
+        if counts:
+            lines.append("| Класс | Объектов |")
+            lines.append("|---|---:|")
+            for label, count in counts.items():
+                lines.append(f"| {label} | {count} |")
+            lines.append("")
+
+        for domain, title in (("item", "Предметы"), ("block", "Блоки")):
+            group = [r for r in semantic.records.values() if r.domain == domain]
+            if not group:
+                continue
+            lines.append(f"## {title}")
+            lines.append("")
+            lines.append("| Объект | Определено как | Применено | Команды |")
+            lines.append("|---|---|---|---|")
+            for record in sorted(group, key=lambda r: r.object_id):
+                applied = ", ".join(f"{k}={v}" for k, v in record.applied.items() if not k.endswith("_previous")) or "—"
+                cmds = "<br>".join(f"`{c}`" for c in record.commands) or "—"
+                lines.append(f"| `{record.object_id}` | {record.description} | {applied} | {cmds} |")
+            lines.append("")
+
+        return "\n".join(lines)
 
     def _coverage_report(self) -> dict[str, Any]:
         """Compute asset/model/texture coverage metrics.
@@ -600,7 +644,29 @@ class Packager:
             lines.append(f"[{level}] {entry['object_id']}")
             lines.append(f"Reason: {entry['reason']}")
             lines.append("")
+
+        # Recommendations the neural pass deliberately did not apply on its
+        # own because they need source data it cannot invent.
+        advisories = self._brain_advisories()
+        if advisories:
+            lines.append("## Рекомендации микро-нейросети")
+            lines.append("")
+            for object_id, reason in advisories:
+                lines.append(f"[LOW] {object_id}")
+                lines.append(f"Reason: {reason}")
+                lines.append("")
         return "\n".join(lines) + "\n"
+
+    def _brain_advisories(self) -> list[tuple[str, str]]:
+        semantic = getattr(self.analysis, "semantics", None)
+        if semantic is None or not getattr(semantic, "enabled", False):
+            return []
+        out: list[tuple[str, str]] = []
+        for record in sorted(semantic.records.values(), key=lambda r: r.object_id):
+            for head, reason in record.skipped.items():
+                if "recommended" in reason:
+                    out.append((record.object_id, f"{head}: {reason}"))
+        return out
 
     def _validation_md(self) -> str:
         return (

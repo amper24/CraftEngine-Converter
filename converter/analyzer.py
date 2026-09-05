@@ -44,6 +44,8 @@ class AnalysisResult:
     # not be limited to the primary namespace.
     content_namespaces: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    # Filled by converter.semantics after analysis (neural verdicts per object).
+    semantics: Any = None
 
     def to_dict(self) -> dict[str, Any]:
         return {

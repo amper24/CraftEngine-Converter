@@ -7,13 +7,13 @@ Bundles schemas/ and mappings/ into the executable and imports the whole
 
 from PyInstaller.utils.hooks import collect_submodules
 
-hiddenimports = collect_submodules("converter") + ["yaml"]
+hiddenimports = collect_submodules("converter") + ["yaml", "numpy"]
 
 a = Analysis(
     ["run_gui.py"],
     pathex=[],
     binaries=[],
-    datas=[("schemas", "schemas"), ("mappings", "mappings")],
+    datas=[("schemas", "schemas"), ("mappings", "mappings"), ("models", "models")],
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
