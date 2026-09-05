@@ -1,0 +1,20 @@
+{
+  "domain": "resources",
+  "version": "26.8",
+  "description": "Resource pack mapping rules and block model simplification.",
+  "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/",
+  "copy_without_change": ["png", "mcmeta", "json", "ogg", "properties"],
+  "resource_kinds": [
+    "textures", "models", "blockstates", "sounds", "lang", "particles", "fonts", "shaders", "atlases", "equipment"
+  ],
+  "block_model_texture_rules": {
+    "1": "cube_all",
+    "2": "cube_column",
+    "3": "cube_bottom_top",
+    "4": "orientable",
+    "5+": "block/cube style generation"
+  },
+  "reload": "/ce reload all for any resource/model/texture change",
+  "file_conflict_resolution": ["merge_json", "retain_matching", "conditional", "merge_pack_mcmeta", "merge_atlas", "merge_font"],
+  "matching_rules": ["all_of", "any_of", "inverted", "filename", "exact", "parent_path_prefix", "parent_path_suffix", "contains", "pattern"]
+}

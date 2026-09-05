@@ -1,0 +1,54 @@
+{
+  "domain": "blocks",
+  "version": "26.8",
+  "top_level": [
+    {
+      "path": "<block_id>",
+      "type": "mapping",
+      "required": true,
+      "description": "Each custom block is one ID under blocks:. Required sections: state or states."
+    }
+  ],
+  "nodes": [
+    { "path": "state", "type": "mapping", "required": false, "description": "Single internal state definition.", "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/states/" },
+    { "path": "states", "type": "mapping", "required": false, "description": "Multi-state definition with properties/appearances/variants.", "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/states/" },
+    { "path": "settings", "type": "mapping", "required": false, "description": "Plugin-driven block settings.", "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/settings/" },
+    { "path": "behavior", "type": "mapping", "required": false, "description": "Single block behavior.", "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/behaviors/" },
+    { "path": "behaviors", "type": "list", "required": false, "description": "Composite block behaviors list.", "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/behaviors/" },
+    { "path": "loot", "type": "mapping", "required": false, "description": "Block loot layer.", "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/" },
+    { "path": "events", "type": "list", "required": false, "description": "Event entries DSL.", "source": "https://xiao-momi.github.io/craft-engine-wiki/reference/events/" }
+  ],
+  "state_nodes": [
+    { "path": "state.auto_state", "type": "string|mapping", "required": false, "description": "Auto-select a free vanilla carrier state from a compatible group.", "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/states/" },
+    { "path": "state.model", "type": "mapping|string", "required": false, "description": "Model/texture configuration for the block visual.", "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/states/" },
+    { "path": "state.id", "type": "integer", "required": false, "description": "Manual internal block id.", "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/states/" },
+    { "path": "state.properties", "type": "mapping", "required": false, "description": "Single-state properties map.", "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/states/" },
+    { "path": "state.transparent", "type": "boolean", "required": false, "description": "Transparent visual state flag.", "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/states/" },
+    { "path": "state.entity_renderer", "type": "mapping", "required": false, "description": "Entity display renderer for state.", "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/" },
+    { "path": "states.id", "type": "integer", "required": false, "description": "Manual start internal block id for states range.", "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/states/" },
+    { "path": "states.properties", "type": "mapping", "required": false, "description": "Multi-state property definitions.", "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/states/" },
+    { "path": "states.appearances", "type": "mapping", "required": false, "description": "Visual appearances keyed by name.", "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/states/" },
+    { "path": "states.variants", "type": "mapping", "required": false, "description": "Maps internal states to appearances/settings.", "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/states/" }
+  ],
+  "auto_state_groups": [
+    "solid", "note_block", "mushroom_stem", "red_mushroom_block", "brown_mushroom_block",
+    "mushroom", "tintable_leaves", "waterlogged_tintable_leaves", "non_tintable_leaves",
+    "waterlogged_non_tintable_leaves", "leaves", "waterlogged_leaves", "lower_tripwire",
+    "higher_tripwire", "tripwire", "sapling", "pressure_plate", "cactus", "sugar_cane",
+    "weeping_vine", "twisting_vine", "cave_vine", "kelp", "chorus"
+  ],
+  "property_types": {
+    "boolean": 2,
+    "int": "max-min+1",
+    "axis": 3,
+    "direction": 6,
+    "horizontal_direction": 4,
+    "half": 2,
+    "hinge": 2,
+    "slab_type": 3,
+    "stairs_shape": 5
+  },
+  "reserved_property_names": [
+    "axis", "facing", "facing_clockwise", "rotation", "waterlogged"
+  ]
+}

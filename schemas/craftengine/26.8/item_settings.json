@@ -1,0 +1,35 @@
+{
+  "domain": "item_settings",
+  "version": "26.8",
+  "description": "Plugin-driven item settings. snake_case canonical keys only.",
+  "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/item/settings/",
+  "settings": [
+    { "name": "fuel_time", "type": "int", "description": "Furnace fuel duration in ticks." },
+    { "name": "break_power", "type": "int", "description": "Tool break power. Vanilla: wood/gold=1, stone/copper=2, iron=3, diamond=4, netherite=5, other=0." },
+    { "name": "tags", "type": "list", "description": "Recipe tags." },
+    { "name": "equipment", "type": "mapping", "description": "Plugin equipment behaviour (target/version dependent)." },
+    { "name": "renameable", "type": "boolean", "default": true, "description": "Allow anvil rename." },
+    { "name": "prevent_break", "type": "boolean", "default": false, "description": "Do not destroy on durability exhaustion." },
+    { "name": "can_place", "type": "boolean", "default": false, "description": "Allow corresponding vanilla block placement." },
+    { "name": "food", "type": "mapping", "description": "Plugin-side food fallback (prefer data components on 1.20.5+)." },
+    { "name": "consume_replacement", "type": "string", "default": null, "description": "Item returned after consume." },
+    { "name": "craft_remainder", "type": "string|mapping", "description": "Crafting remainder rules (fixed / hurt_and_break / recipe_based)." },
+    { "name": "craft_remaining_item", "type": "string|mapping", "description": "Alias of craft_remainder." },
+    { "name": "fuel_remainder", "type": "string", "description": "Returned item after fuel consumption (stack size 1)." },
+    { "name": "invulnerable", "type": "list", "description": "Damage sources ignored by item entity." },
+    { "name": "enchantable", "type": "boolean", "default": true, "description": "Allow enchantment table use." },
+    { "name": "compost_probability", "type": "float", "default": 0.5, "description": "Probability of composting." },
+    { "name": "keep_on_death_chance", "type": "float", "description": "Probability of keeping item on death (0..1)." },
+    { "name": "destroy_on_death_chance", "type": "float", "description": "Probability of destroying on death (0..1)." },
+    { "name": "drop_display", "type": "bool|string", "description": "Dropped-item name/count display." },
+    { "name": "glow_color", "type": "string", "description": "Colored item glow (named color)." }
+  ],
+  "break_power_values": { "wood": 1, "gold": 1, "stone": 2, "copper": 2, "iron": 3, "diamond": 4, "netherite": 5, "other": 0 },
+  "glow_colors": ["black", "dark_blue", "dark_green", "dark_aqua", "dark_red", "dark_purple", "gold", "gray", "dark_gray", "blue", "green", "aqua", "red", "light_purple", "yellow", "white"],
+  "craft_remainder_types": {
+    "fixed": { "item": "string", "count": "int" },
+    "hurt_and_break": { "damage": "int" },
+    "recipe_based": { "terms": "list of {recipes, craft_remainder}" }
+  },
+  "non_canonical_camelcase_warning": "fuelTime, maxStackSize and similar camelCase forms are NOT canonical YAML syntax."
+}

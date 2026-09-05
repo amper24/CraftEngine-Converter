@@ -1,0 +1,35 @@
+{
+  "platform": "craftengine",
+  "version": "26.8",
+  "schema_version": "1",
+  "schema_files": [
+    "items.json",
+    "item_data.json",
+    "item_models.json",
+    "item_settings.json",
+    "item_behaviors.json",
+    "blocks.json",
+    "block_states.json",
+    "block_settings.json",
+    "block_behaviors.json",
+    "furniture.json",
+    "recipes.json",
+    "loot.json",
+    "events.json",
+    "functions.json",
+    "resources.json"
+  ],
+  "reload_commands": {
+    "config": "/ce reload config",
+    "recipe": "/ce reload recipe",
+    "resource": "/ce reload all",
+    "all": "/ce reload all"
+  },
+  "per_object_file_layout": {
+    "item": "craftengine/items/<namespace>/<id>.yml",
+    "block": "craftengine/blocks/<namespace>/<id>.yml",
+    "furniture": "craftengine/furniture/<namespace>/<id>.yml",
+    "recipe": "craftengine/recipes/<namespace>/<id>.yml",
+    "loot": "craftengine/loot/<namespace>/<id>.yml"
+  }
+}

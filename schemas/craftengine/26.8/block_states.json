@@ -1,0 +1,37 @@
+{
+  "domain": "block_states",
+  "version": "26.8",
+  "description": "Block state property types and variant matching rules.",
+  "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/states/",
+  "property_types": {
+    "boolean": { "values": ["true", "false"], "count": 2 },
+    "int": { "range": "min~max", "count": "max-min+1", "example": { "type": "int", "default": 7, "range": "1~7" } },
+    "axis": { "values": ["x", "y", "z"], "count": 3 },
+    "direction": { "values": ["north", "south", "west", "east", "up", "down"], "count": 6 },
+    "horizontal_direction": { "values": ["north", "south", "west", "east"], "count": 4 },
+    "half": { "values": ["top", "bottom"], "count": 2 },
+    "hinge": { "values": ["left", "right"], "count": 2 },
+    "slab_type": { "values": ["top", "bottom", "double"], "count": 3 },
+    "stairs_shape": { "values": ["straight", "inner_left", "inner_right", "outer_left", "outer_right"], "count": 5 }
+  },
+  "reserved_property_names": {
+    "axis": "automatic axis alignment on placement",
+    "facing": "automatic placement direction",
+    "facing_clockwise": "horizontal direction with rotation",
+    "rotation": "exact rotation (0..7 or 0..15)",
+    "waterlogged": "water state"
+  },
+  "variant_rules": {
+    "separator": ",",
+    "format": "property=value",
+    "wildcard": "unlisted properties act as wildcards",
+    "overlap": "later matching variant overrides settings values while preserving other merged values",
+    "property_order_irrelevant": true,
+    "appearance_fallback": "first appearance used as default fallback"
+  },
+  "property_definition_example": {
+    "waterlogged": { "type": "boolean", "default": false },
+    "facing": { "type": "horizontal_direction", "default": "north" },
+    "age": { "type": "int", "default": 0, "range": "0~7" }
+  }
+}

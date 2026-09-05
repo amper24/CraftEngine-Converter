@@ -1,0 +1,26 @@
+{
+  "domain": "recipes",
+  "version": "26.8",
+  "description": "Recipe top-level contract. Only confirmed recipe type is shapeless_transform; other types require target Recipe page.",
+  "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/recipe/",
+  "top_level": [{ "path": "recipes", "type": "mapping", "required": true, "description": "Recipe entries keyed by id." }],
+  "confirmed_types": ["shapeless", "shapeless_transform", "shaped"],
+  "confirmed_example": {
+    "default:sharpness_upgrade": {
+      "type": "shapeless_transform",
+      "ingredients": [
+        { "items": "minecraft:diamond_sword", "source": true },
+        { "items": "minecraft:paper", "predicate": [{ "type": "enchantment", "enchantments": { "minecraft:sharpness": 5 } }] }
+      ],
+      "result": { "id": "default:topaz_sword", "count": 1 }
+    }
+  },
+  "confirmed_unlock_fields": ["unlock_on_ingredient_obtained", "unlock_on_join"],
+  "global_unlock_example": {
+    "recipe": {
+      "unlock-on-join": { "all": false, "list": ["default:amethyst_torch"] }
+    }
+  },
+  "note": "For exact recipe types, ingredient schema, processors and premium-only fields, use the target version Recipe page. Unknown source serializers must be preserved in IR and reported as UNSUPPORTED rather than silently generated.",
+  "reload": "/ce reload recipe"
+}

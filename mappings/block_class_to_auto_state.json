@@ -1,0 +1,30 @@
+{
+  "domain": "block_class_to_auto_state",
+  "description": "Heuristic mapping from vanilla block class / blockstate carrier to CraftEngine auto_state group.",
+  "mappings": {
+    "leaves": "leaves",
+    "fence": "solid",
+    "fence_gate": "solid",
+    "wall": "solid",
+    "stairs": "solid",
+    "slab": "solid",
+    "door": "solid",
+    "trapdoor": "solid",
+    "pressure_plate": "pressure_plate",
+    "button": "solid",
+    "sapling": "sapling",
+    "crop": "sapling",
+    "torch": "solid",
+    "plant": "sapling",
+    "flower": "sapling",
+    "bush": "sapling",
+    "cactus": "cactus",
+    "sugar_cane": "sugar_cane",
+    "mushroom": "mushroom",
+    "mushroom_block": "mushroom_stem",
+    "kelp": "kelp",
+    "vine": "weeping_vine"
+  },
+  "default": "note_block",
+  "transparent_default": "note_block"
+}

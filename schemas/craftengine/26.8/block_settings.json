@@ -1,0 +1,37 @@
+{
+  "domain": "block_settings",
+  "version": "26.8",
+  "description": "Stable and unstable block settings. snake_case canonical keys only.",
+  "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/settings/",
+  "stable": [
+    { "name": "hardness", "type": "float", "default": 2.0, "description": "Break duration." },
+    { "name": "resistance", "type": "float", "default": 2.0, "description": "Explosion resistance." },
+    { "name": "push_reaction", "type": "string", "default": "NORMAL", "description": "Piston behavior.", "enum": ["NORMAL", "DESTROY", "BLOCK", "IGNORE", "PUSH_ONLY", "NORMAL_ONLY"] },
+    { "name": "map_color", "type": "string|int", "default": 0, "description": "Map color." },
+    { "name": "burnable", "type": "boolean", "default": false, "description": "Whether block can be set on fire." },
+    { "name": "fire_spread_chance", "type": "int", "default": 0, "description": "Fire spreading chance." },
+    { "name": "burn_chance", "type": "int", "default": 0, "description": "Ignite chance." },
+    { "name": "item", "type": "string", "required": false, "description": "Associated block item ID (block -> item lookup)." },
+    { "name": "replaceable", "type": "boolean", "default": false, "description": "Replaceable block." },
+    { "name": "is_redstone_conductor", "type": "string", "default": "UNDEFINED", "enum": ["TRUE", "FALSE", "UNDEFINED"] },
+    { "name": "is_suffocating", "type": "string", "default": "UNDEFINED", "enum": ["TRUE", "FALSE", "UNDEFINED"] },
+    { "name": "is_view_blocking", "type": "string", "default": "UNDEFINED", "enum": ["TRUE", "FALSE", "UNDEFINED"] },
+    { "name": "sounds", "type": "mapping", "default": null, "description": "Block sound set (break/step/place/hit/fall), each string or {id,pitch,volume}." },
+    { "name": "require_correct_tools", "type": "boolean", "default": false, "description": "Correct tool required for drop." },
+    { "name": "respect_tool_component", "type": "boolean", "default": false, "description": "Respect minecraft:tool.correct_for_drops component." },
+    { "name": "correct_tools", "type": "list", "default": null, "description": "Whitelist of correct tool ids." },
+    { "name": "incorrect_tool_dig_speed", "type": "float", "default": 0.3, "description": "Speed multiplier for wrong tool. Range 0..1." },
+    { "name": "tags", "type": "list", "default": null, "description": "Block tags." },
+    { "name": "client_bound_tags", "type": "list", "default": null, "description": "Client-side vanilla block tags." },
+    { "name": "instrument", "type": "string", "default": "harp", "description": "Note block instrument." },
+    { "name": "fluid_state", "type": "string", "default": "empty", "description": "Fluid state." },
+    { "name": "support_shape", "type": "string", "default": null, "description": "Support shape source block state." },
+    { "name": "destroy_stages", "type": "mapping", "default": null, "description": "Custom mining crack display items and offsets." }
+  ],
+  "unstable": [
+    "bounce_restitution", "friction", "jump_factor", "speed_factor",
+    "luminance", "can_occlude", "block_light", "propagate_skylight"
+  ],
+  "sound_keys": ["fall", "hit", "break", "step", "place"],
+  "burn_sound_note": "Burnable blocks usually need fire_spread_chance and burn_chance."
+}

@@ -1,0 +1,144 @@
+craftengine_version: "26.8.2"
+minecraft_version: "1.21.4"
+item_material_fallback: paper
+emit_item_material: false
+emit_food_apple_material: false
+generate_categories: true
+generate_category_translations: true
+organize_recipes: true
+recipe_sort_mode: type_then_id
+log_level: INFO
+write_conversion_log: true
+copy_all_assets: true
+validate_resource_links: true
+block_auto_state: solid
+# Маппинг исходного типа рецепта -> целевая "станция".
+# "crafting_table" = перенос в обычный верстак (shapeless_transform).
+recipe_stations:
+  farmersdelight:cooking: crafting_table
+  farmersdelight:cutting: sliceboard
+# Если True, неизвестные типы рецептов автоматически переносятся в верстак.
+remap_unknown_stations: false
+remap_unknown_station_target: crafting_table
+# Добавлять предмет-контейнер (например, кастрюлю) как ингредиент при переносе.
+# По умолчанию false: контейнер НЕ добавляется в рецепт.
+include_container_ingredient: false
+# Предмет, который добавляется как ингредиент для конкретного типа/namespace.
+container_items:
+  farmersdelight:cooking: farmersdelight:cooking_pot
+  farmersdelight:cutting: farmersdelight:cutting_board
+
+# --- SliceBoard (нарезка на доске) ---
+sliceboard_enabled: true
+sliceboard_custom_provider: craftengine
+# Prefix resolver for non-vanilla IDs in SliceBoard: <prefix>:<item_path>.
+# The GUI proposes values from recipe references and dependencies.
+sliceboard_namespace_prefixes:
+  farmersdelight: craftengine:farmersdelight
+# Внешние namespace, которые удалить из ингредиентов рецептов.
+# После исключения пустые рецепты полностью удаляются.
+excluded_recipe_namespaces: []
+interactive_namespace_mapping: true
+strict_recipe_mode: false
+# What to do when a recipe references a common/external tag that cannot be resolved
+# from the source mod or a known dependency bridge: skip (default) or keep.
+unresolved_recipe_tag_policy: skip
+preserve_unsupported_recipes: true
+generate_source_map: true
+sliceboard_tool_keywords:
+  - knife
+  - cleaver
+  - sword
+  - scissors
+  - blade
+# ID кастомных блоков-досок CraftEngine (генерируется в sliceboard/config.yml).
+sliceboard_block_ids:
+  - farmersdelight:cutting_board
+
+# --- Еда (базовые значения, меняй вручную) ---
+food_enabled: true
+food_nutrition: 4
+food_saturation: 3.0
+# Семантические carrier-materials. Материал выводится ТОЛЬКО для этих семейств.
+drink_material: honey_bottle
+soup_material: mushroom_stew
+drink_keywords:
+  - drink
+  - juice
+  - cider
+  - tea
+  - coffee
+  - milk
+  - water
+  - syrup
+  - nectar
+  - smoothie
+  - lemonade
+  - soda
+  - wine
+  - mead
+  - latte
+  - cocoa
+  - kombucha
+  - tonic
+soup_keywords:
+  - soup
+  - stew
+  - chowder
+  - broth
+  - bisque
+  - hotpot
+food_keywords:
+  - soup
+  - salad
+  - stew
+  - sandwich
+  - burger
+  - wrap
+  - pie
+  - cake
+  - brownie
+  - noodle
+  - pancake
+  - cupcake
+  - patty
+  - pizza
+  - skewer
+  - bread
+  - slaw
+  - mushroom
+  - juice
+  - water
+  - honey
+  - chip
+  - rice
+  - pasta
+  - mhadjeb
+# --- Bytecode food extraction ---
+bytecode_food_enabled: true
+# If true, unmatched bytecode food fields are treated as conversion warnings/errors by future strict validation.
+bytecode_food_strict: false
+# --- Semantic reconstruction ---
+bytecode_semantic_enabled: true
+reconstruct_block_behaviors: true
+reconstruct_item_components: true
+reconstruct_loot_from_datagen: true
+reconstruct_events_from_bytecode: true
+conservative_phantom_filter: true
+gear_enabled: true
+gear_tool_keywords: [pickaxe, axe, shovel, hoe, shears, wrench]
+gear_weapon_keywords: [sword, mace, dagger, hammer, club, rapier, katana, greatsword]
+gear_spear_keywords: [spear, lance, javelin, halberd, glaive, pike]
+gear_ranged_keywords: [bow, crossbow]
+gear_shield_keywords: [shield, buckler]
+armor_keywords: [helmet, chestplate, leggings, boots, armor, armour]
+
+# --- Crop reconstruction ---
+crop_reconstruction_enabled: true
+crop_default_grow_speed: 0.5
+crop_light_requirement: 9
+crop_default_hardness: 0.0
+crop_default_resistance: 0.0
+crop_generate_loot_when_missing: true
+crop_seed_relation_from_bytecode: true
+crop_seed_name_suffixes: ["_seeds", "_seed"]

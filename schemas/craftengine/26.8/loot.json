@@ -1,0 +1,10 @@
+{
+  "domain": "loot",
+  "version": "26.8",
+  "description": "Loot is a separate layer for block/furniture drops. Preserve source loot table structure; full vanilla-style loot DSL as-is.",
+  "source": "https://xiao-momi.github.io/craft-engine-wiki/configuration/block/",
+  "top_level": [{ "path": "<loot_id>", "type": "mapping", "required": true }],
+  "known_entry_keys": ["pools", "type", "rolls", "bonus_rolls", "entries", "conditions", "functions"],
+  "drop_loot_function": "drop_loot event function can force-execute a loot table with to_inventory option.",
+  "note": "Preserve datapack loot_tables/*.json content verbatim into IR/source-map; generation uses them as self-contained loot definitions keyed by id."
+}
