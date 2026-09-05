@@ -148,10 +148,23 @@ def classify_recipe(recipe: RecipeNode, settings: Settings | None = None) -> Dec
     station = settings.effective_station(recipe.recipe_type)
     recipe.station = station
 
+    # Recipe serializers verified against RecipeSerializers.java in the
+    # CraftEngine 26.8 source. These native types map 1:1 and are DIRECT.
+    NATIVE_RECIPE_TYPES = {
+        "crafting_shaped", "crafting_shapeless",
+        "shaped", "shapeless", "shaped_transform", "shapeless_transform",
+        "dye", "crafting_dye",
+        "smelting", "blasting", "smoking", "campfire_cooking",
+        "stonecutting", "smithing_transform", "smithing_trim", "brewing",
+    }
+
     if station == "crafting_table":
-        if short == "crafting_shapeless":
+        if short in ("crafting_shapeless", "shapeless"):
             result = status.DIRECT
-            reason = "Shapeless crafting recipe maps to shapeless_transform."
+            reason = "Shapeless crafting recipe maps to a native CraftEngine shapeless recipe."
+        elif short in ("crafting_shaped", "shaped"):
+            result = status.DIRECT
+            reason = "Shaped crafting recipe maps to a native CraftEngine shaped recipe."
         else:
             result = status.TRANSFORM
             reason = f"Recipe type '{recipe.recipe_type}' remapped to the crafting table (shapeless_transform)."
@@ -161,12 +174,9 @@ def classify_recipe(recipe: RecipeNode, settings: Settings | None = None) -> Dec
     elif station == "unknown":
         result = status.UNSUPPORTED
         reason = f"UNKNOWN_SOURCE_SERIALIZER: unsupported recipe type '{recipe.recipe_type}'."
-    elif station in ("furnace", "blast_furnace", "smoker", "campfire"):
-        result = status.PARTIAL
-        reason = f"{short} recipe has a known result/ingredient but cooking semantics are not fully verified for 26.8."
-    elif station in ("smithing_table",):
-        result = status.PARTIAL
-        reason = f"{short} recipe ingredients preserved; direct target schema for smithing is unconfirmed."
+    elif short in NATIVE_RECIPE_TYPES:
+        result = status.DIRECT
+        reason = f"{short} is a native CraftEngine recipe serializer and is preserved directly."
     else:
         result = status.UNSUPPORTED
         reason = f"UNKNOWN_SOURCE_SERIALIZER: unsupported recipe type '{recipe.recipe_type}'."

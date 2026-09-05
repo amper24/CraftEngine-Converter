@@ -84,9 +84,10 @@ class Settings:
     # --- automatic bytecode semantic reconstruction ---
     bytecode_semantic_enabled: bool = True
     gear_enabled: bool = True
-    gear_tool_keywords: list[str] = field(default_factory=lambda: ["pickaxe","axe","shovel","hoe","shears","tool"])
-    gear_weapon_keywords: list[str] = field(default_factory=lambda: ["sword","dagger","mace","hammer","katana","rapier","greatsword","weapon","knife"])
+    gear_tool_keywords: list[str] = field(default_factory=lambda: ["pickaxe","axe","shovel","hoe","shears","wrench"])
+    gear_weapon_keywords: list[str] = field(default_factory=lambda: ["sword","mace","dagger","hammer","club","rapier","katana","greatsword"])
     gear_spear_keywords: list[str] = field(default_factory=lambda: ["spear","lance","javelin","halberd","glaive","pike"])
+    gear_ranged_keywords: list[str] = field(default_factory=lambda: ["bow","crossbow"])
     gear_shield_keywords: list[str] = field(default_factory=lambda: ["shield","buckler"])
     armor_keywords: list[str] = field(default_factory=lambda: ["helmet","chestplate","leggings","boots","armor","armour"])
     reconstruct_block_behaviors: bool = True
@@ -126,19 +127,6 @@ class Settings:
     soup_keywords: list[str] = field(default_factory=lambda: [
         "soup", "stew", "chowder", "broth", "bisque", "hotpot",
     ])
-    gear_enabled: bool = True
-    gear_tool_keywords: list[str] = field(default_factory=lambda: ["pickaxe","axe","shovel","hoe","shears","wrench"])
-    gear_weapon_keywords: list[str] = field(default_factory=lambda: ["sword","mace","dagger","hammer","club","rapier","katana","greatsword"])
-    gear_spear_keywords: list[str] = field(default_factory=lambda: ["spear","lance","javelin","halberd","glaive","pike"])
-    gear_ranged_keywords: list[str] = field(default_factory=lambda: ["bow","crossbow"])
-    gear_shield_keywords: list[str] = field(default_factory=lambda: ["shield","buckler"])
-    armor_keywords: list[str] = field(default_factory=lambda: ["helmet","chestplate","leggings","boots","armor","armour"])
-    bytecode_semantic_enabled: bool = True
-    reconstruct_block_behaviors: bool = True
-    reconstruct_item_components: bool = True
-    reconstruct_loot_from_datagen: bool = True
-    reconstruct_events_from_bytecode: bool = True
-    conservative_phantom_filter: bool = True
     food_keywords: list[str] = field(
         default_factory=lambda: [
             "soup", "salad", "stew", "sandwich", "burger", "wrap", "pie",
@@ -211,6 +199,7 @@ class Settings:
             "excluded_recipe_namespaces": self.excluded_recipe_namespaces,
             "interactive_namespace_mapping": self.interactive_namespace_mapping,
             "strict_recipe_mode": self.strict_recipe_mode,
+            "unresolved_recipe_tag_policy": self.unresolved_recipe_tag_policy,
             "preserve_unsupported_recipes": self.preserve_unsupported_recipes,
             "generate_source_map": self.generate_source_map,
             "sliceboard_tool_keywords": self.sliceboard_tool_keywords,
@@ -241,6 +230,14 @@ class Settings:
             "gui_icon_enabled": self.gui_icon_enabled,
             "gui_icon_suffixes": self.gui_icon_suffixes,
             "gui_icon_prefer_exact_item_texture": self.gui_icon_prefer_exact_item_texture,
+            "crop_reconstruction_enabled": self.crop_reconstruction_enabled,
+            "crop_default_grow_speed": self.crop_default_grow_speed,
+            "crop_light_requirement": self.crop_light_requirement,
+            "crop_default_hardness": self.crop_default_hardness,
+            "crop_default_resistance": self.crop_default_resistance,
+            "crop_generate_loot_when_missing": self.crop_generate_loot_when_missing,
+            "crop_seed_relation_from_bytecode": self.crop_seed_relation_from_bytecode,
+            "crop_seed_name_suffixes": self.crop_seed_name_suffixes,
             "food_keywords": self.food_keywords,
         }
 
@@ -309,6 +306,19 @@ def _as_settings(data: Any) -> Settings:
     s.reconstruct_loot_from_datagen = bool(data.get("reconstruct_loot_from_datagen", s.reconstruct_loot_from_datagen))
     s.reconstruct_events_from_bytecode = bool(data.get("reconstruct_events_from_bytecode", s.reconstruct_events_from_bytecode))
     s.conservative_phantom_filter = bool(data.get("conservative_phantom_filter", s.conservative_phantom_filter))
+    s.gui_icon_enabled = bool(data.get("gui_icon_enabled", s.gui_icon_enabled))
+    if isinstance(data.get("gui_icon_suffixes"), list):
+        s.gui_icon_suffixes = [str(x) for x in data["gui_icon_suffixes"]]
+    s.gui_icon_prefer_exact_item_texture = bool(data.get("gui_icon_prefer_exact_item_texture", s.gui_icon_prefer_exact_item_texture))
+    s.crop_reconstruction_enabled = bool(data.get("crop_reconstruction_enabled", s.crop_reconstruction_enabled))
+    s.crop_default_grow_speed = float(data.get("crop_default_grow_speed", s.crop_default_grow_speed))
+    s.crop_light_requirement = int(data.get("crop_light_requirement", s.crop_light_requirement))
+    s.crop_default_hardness = float(data.get("crop_default_hardness", s.crop_default_hardness))
+    s.crop_default_resistance = float(data.get("crop_default_resistance", s.crop_default_resistance))
+    s.crop_generate_loot_when_missing = bool(data.get("crop_generate_loot_when_missing", s.crop_generate_loot_when_missing))
+    s.crop_seed_relation_from_bytecode = bool(data.get("crop_seed_relation_from_bytecode", s.crop_seed_relation_from_bytecode))
+    if isinstance(data.get("crop_seed_name_suffixes"), list):
+        s.crop_seed_name_suffixes = [str(x) for x in data["crop_seed_name_suffixes"]]
     if isinstance(data.get("food_keywords"), list):
         s.food_keywords = [str(x) for x in data["food_keywords"]]
     return s

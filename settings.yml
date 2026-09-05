@@ -1,4 +1,4 @@
-craftengine_version: "26.8.2"
+craftengine_version: "26.8"
 minecraft_version: "1.21.4"
 item_material_fallback: paper
 emit_item_material: false
@@ -132,6 +132,12 @@ gear_spear_keywords: [spear, lance, javelin, halberd, glaive, pike]
 gear_ranged_keywords: [bow, crossbow]
 gear_shield_keywords: [shield, buckler]
 armor_keywords: [helmet, chestplate, leggings, boots, armor, armour]
+
+# --- GUI icon handling ---
+# Keep one logical item when a source block/item has a dedicated 2D icon.
+gui_icon_enabled: true
+gui_icon_suffixes: ["_icon", "_inventory", "_gui"]
+gui_icon_prefer_exact_item_texture: true
 
 # --- Crop reconstruction ---
 crop_reconstruction_enabled: true

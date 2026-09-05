@@ -1,11 +1,10 @@
 {
   "domain": "property_name_types",
-  "description": "Maps common vanilla blockstate property names to CraftEngine property types and reserved behavior.",
+  "description": "Maps common vanilla blockstate property names to CraftEngine property types and reserved behavior. Only registered CraftEngine 26.8 property types are emitted; unknown enums are handled by the analyzer as `string` with an explicit values list.",
   "types": {
     "facing": "horizontal_direction",
     "axis": "axis",
     "waterlogged": "boolean",
-    "half": "half",
     "open": "boolean",
     "powered": "boolean",
     "lit": "boolean",
@@ -28,12 +27,7 @@
     "east": "boolean",
     "west": "boolean",
     "hinge": "hinge",
-    "type": "custom_enum",
-    "shape": "custom_enum",
-    "face": "custom_enum",
-    "part": "custom_enum",
-    "mode": "custom_enum",
-    "orientation": "custom_enum",
+    "half": "double_block_half",
     "age": "int",
     "stage": "int",
     "layers": "int",
@@ -51,5 +45,5 @@
     "note": "int"
   },
   "reserved": ["axis", "facing", "facing_clockwise", "rotation", "waterlogged"],
-  "note": "This file had a known typo candidate (south/east duplicate key); keep mapping keys unique. Unknown property names become custom_enum/none and are preserved in IR."
+  "note": "half maps to double_block_half (upper/lower: doors, tall plants). Trapdoor's half (top/bottom) is resolved to single_block_half by the analyzer based on the observed values. For property name `type`, `shape`, `face`, `part`, `mode`, `orientation` no fixed enum type can be chosen; the analyzer emits `type: string` with a values list."
 }
