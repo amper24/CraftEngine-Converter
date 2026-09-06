@@ -447,7 +447,17 @@ class SettingsDialog(tk.Toplevel):
         self._bool(semantic, "reconstruct_events_from_bytecode", "Пытаться переводить bytecode events", 5)
         self._bool(semantic, "reconstruct_loot_from_datagen", "Учитывать datagen loot", 6)
         self._bool(semantic, "conservative_phantom_filter", "Строго отсеивать helper/stage ресурсы", 7)
-        ttk.Label(semantic, text="Ключевые слова можно расширить через settings.yml.\nНеоднозначные значения записываются в reports/bytecode-semantics.json, а не угадываются молча.").grid(row=8, column=0, columnspan=2, sticky="w", pady=(10, 4))
+        ttk.Separator(semantic, orient="horizontal").grid(row=9, column=0, columnspan=2, sticky="ew", pady=10)
+        ttk.Label(semantic, text="Микро-нейросеть (определение типа предмета/блока)", font=("TkDefaultFont", 12, "bold")).grid(row=10, column=0, columnspan=2, sticky="w", pady=(0, 8))
+        self._bool(semantic, "brain_enabled", "Включить нейросетевую классификацию", 11)
+        self._bool(semantic, "brain_categories", "Нейросеть выбирает категорию, если нет тегов", 12)
+        self._bool(semantic, "brain_food_detection", "Нейросеть определяет еду/напитки/супы", 13)
+        self._bool(semantic, "brain_log_every_object", "Писать вердикт по каждому объекту в лог", 14)
+        self._entry(semantic, "brain_min_confidence", "Порог уверенности (предметы)", self.settings.brain_min_confidence, 15)
+        self._entry(semantic, "brain_block_min_confidence", "Порог уверенности (блоки)", self.settings.brain_block_min_confidence, 16)
+        ttk.Label(semantic, text="Вердикты и готовые команды: reports/semantics.md и reports/commands.txt").grid(row=17, column=0, columnspan=2, sticky="w", pady=(4, 0))
+
+        ttk.Label(semantic, text="Ключевые слова можно расширить через settings.yml.\nНеоднозначные значения записываются в reports/bytecode-semantics.json, а не угадываются молча.").grid(row=18, column=0, columnspan=2, sticky="w", pady=(10, 4))
         semantic.columnconfigure(1, weight=1)
 
         bottom = ttk.Frame(self); bottom.pack(fill="x", padx=10, pady=(0, 10))

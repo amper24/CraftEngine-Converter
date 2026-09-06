@@ -114,6 +114,16 @@ food_keywords:
   - rice
   - pasta
   - mhadjeb
+# --- Микро-нейросеть (определение типа предмета/блока) ---
+# Классифицирует каждый объект, подсказывает представление в CraftEngine
+# и генерирует команды проверки (reports/commands.txt, reports/semantics.md).
+brain_enabled: true
+brain_min_confidence: 0.6
+brain_block_min_confidence: 0.7
+brain_log_every_object: true
+brain_categories: true
+brain_food_detection: true
+
 # --- Bytecode food extraction ---
 bytecode_food_enabled: true
 # If true, unmatched bytecode food fields are treated as conversion warnings/errors by future strict validation.

@@ -6,7 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from . import __version__, analyzer, capability, generator, packager, validator, util, fidelity, status
+from . import __version__, analyzer, capability, generator, packager, semantics, validator, util, fidelity, status
 from .archive import ModArchive, open_archive
 from .config import Settings, load_settings
 from .sliceboard import generate_sliceboard
@@ -40,6 +40,13 @@ class ConversionDriver:
         with open_archive(self.input_path, self.log) as archive:
             self.log.phase("ANALYZE", "Анализ исходного мода")
             analysis = analyzer.analyze_archive(archive, self.log, self.minecraft_version, settings)
+
+            # Neural semantic pass: classify every detected object, apply the
+            # safe conclusions to the IR and record what it decided.
+            self.log.phase("BRAIN", "Нейросемантическая классификация объектов")
+            semantic_result = semantics.apply_semantics(analysis, settings, self.log)
+            analysis.semantics = semantic_result
+
             self.log.phase("MAPPING", "Построение semantic mapping")
             mapping = capability.build_mapping(analysis, settings)
 
@@ -105,6 +112,8 @@ class ConversionDriver:
                 encoding="utf-8",
             )
 
+            self._write_semantics_reports(semantic_result)
+
             source_hash = util.sha256_file(self.input_path) if self.input_path.is_file() else "directory"
             self.log.phase("DONE", "Конвертация завершена", generated=len(generation.files), validation=validation.valid, fidelity=not bool(fidelity_result["issues"]))
 
@@ -119,7 +128,47 @@ class ConversionDriver:
             "diagnostics": len(generation.diagnostics),
             "validation": validation.to_dict(),
             "fidelity": fidelity_result,
+            "semantics": {
+                "enabled": semantic_result.enabled,
+                "reason": semantic_result.reason,
+                "classified": len(semantic_result.records),
+                "counts": semantic_result.counts(),
+            },
         }
+
+    def _write_semantics_reports(self, semantic_result: "semantics.SemanticResult") -> None:
+        """Persist the neural verdicts and the in-game check commands.
+
+        ``reports/semantics.json`` is the machine-readable form; ``commands.txt``
+        is a ready-to-paste list of CraftEngine commands for every converted
+        object, which is the fastest way to verify a conversion in-game.
+        """
+        import json
+
+        reports = self.output_dir / "reports"
+        reports.mkdir(parents=True, exist_ok=True)
+        (reports / "semantics.json").write_text(
+            json.dumps(semantic_result.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+        if not semantic_result.records:
+            return
+
+        lines = [
+            "# CraftEngine: команды для проверки сконвертированного контента",
+            "# Сгенерировано микро-нейросетью конвертера.",
+            "",
+        ]
+        for domain, title in (("item", "Предметы"), ("block", "Блоки")):
+            group = [r for r in semantic_result.records.values() if r.domain == domain and r.commands]
+            if not group:
+                continue
+            lines.append(f"## {title}")
+            for record in sorted(group, key=lambda r: r.object_id):
+                lines.append(f"# {record.object_id} — {record.description}")
+                lines.extend(record.commands)
+                lines.append("")
+        (reports / "commands.txt").write_text("\n".join(lines), encoding="utf-8")
 
     def _copy_resources(self, archive: ModArchive, analysis: analyzer.AnalysisResult) -> None:
         """Copy source assets into the output resource pack.

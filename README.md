@@ -19,8 +19,12 @@
 - Каждый объект — отдельный YAML-файл (`configuration/<type>/<namespace>/<id>.yml`).
 - Генерация рецептов нарезки для **SliceBoard** (`sliceboard/`).
 - Полнота: `Detected = Generated + Diagnostic-only` (silent drop запрещён).
-- Отчёты (summary / unsupported / partial / manual-tasks / warnings / validation),
-  manifest, source-map и README результата.
+- **Микро-нейросеть**: определяет, что за объект конвертируется (еда, инструмент,
+  оружие, растение, механизм, мебель…), какое представление в CraftEngine ему
+  нужно (auto_state, прозрачность, entity-renderer) и выдаёт готовые игровые
+  команды для проверки каждого объекта.
+- Отчёты (summary / semantics / commands / unsupported / partial / manual-tasks /
+  warnings / validation), manifest, source-map и README результата.
 
 ## Структура
 
@@ -38,10 +42,13 @@ converter/
   packager.py   output-пакет (manifest/reports/source-map/resourcepack)
   validator.py  валидатор выходного пакета
   gui.py        GUI (tkinter)
+  semantics.py  нейросемантический проход (применение вердиктов к IR)
+  brain/        микро-нейросеть (features / labels / runtime / dataset / train)
   schema.py     target-schema registry + validator
   config.py     настройки + settings.yml
   util.py, paths.py, status.py
 
+models/brain/               веса микро-нейросети (.npz, ~2 МБ на голову)
 schemas/craftengine/26.8/   машиночитаемые target-схемы
 mappings/                   data-driven mapping-правила
 tests/                      фикстура и проверки
@@ -49,11 +56,14 @@ tests/                      фикстура и проверки
 
 ## Установка
 
-Требуется Python 3.10+ и PyYAML (GUI — стандартный tkinter).
+Требуется Python 3.10+, PyYAML и NumPy (GUI — стандартный tkinter).
 
 ```bash
-python -m pip install pyyaml
+python -m pip install pyyaml numpy
 ```
+
+NumPy нужен только микро-нейросети. Без него конвертер продолжает работать,
+просто возвращается к прежним эвристикам по именам и тегам.
 
 ## Быстрый запуск
 
@@ -235,5 +245,84 @@ Categories are generated as the final semantic generation phase, after items, bl
 This build includes CE-native loot normalization, crop bytecode reconstruction, seed-to-crop block binding, common-tag materialization, and SliceBoard kept outside the CraftEngine configuration tree.
 
 Loot conversion normalizes vanilla `minecraft:item`, `minecraft:alternatives`, `minecraft:block_state_property`, `minecraft:uniform`, and related function/condition identifiers to the corresponding CraftEngine forms.
-#   C r a f t E n g i n e - C o n v e r t e r  
+#   C r a f t E n g i n e - C o n v e r t e r 
  
+ 
+
+## Микро-нейросеть
+
+Конвертер содержит небольшую собственную нейросеть, которая на этапе анализа
+отвечает на три вопроса по каждому найденному объекту:
+
+1. **Что это за предмет?** — категория (`Tools`, `Weapons`, `Drinks`, `Meals`,
+   `Sweets`, `Crops`, `Cabinets`, …), тип снаряжения (`tool` / `weapon` / `bow`
+   / `spear` / `shield` / `armor`), пищевая семья (`food` / `drink` / `soup` /
+   `sweet`) и материал-тир (`iron`, `netherite`, …).
+2. **Как его представить в CraftEngine?** — тип блока (`solid`, `crop`,
+   `leaves`, `thin`, `glass`, `machine`, `furniture`, …), значение
+   `auto_state`, прозрачность и нужен ли entity-renderer.
+3. **Какие команды дать игроку?** — готовые `/ce give`, `/ce setblock`,
+   `/ce debug …` для проверки результата прямо в игре.
+
+### Архитектура
+
+Многоголовый MLP на чистом NumPy: хэшированные символьные n-граммы + слова +
+отдельное пространство для «главного существительного» имени, затем два
+скрытых слоя (256 → 128) с GELU и по одной softmax-голове на задачу. Веса —
+два `.npz` файла примерно по 2 МБ, никакого torch/ONNX, инференс мгновенный
+и полностью детерминированный.
+
+### Правила применения
+
+* **Данные из мода важнее предсказания.** Если анализатор нашёл настоящий
+  food-компонент в байткоде, тег `minecraft:mineable/axe`, свойство `age` у
+  блока или категорию из recipe-book — нейросеть их не перезаписывает.
+* **Порог уверенности.** Предсказание ниже порога записывается как совет, но
+  не применяется.
+* **Всё видно.** Каждое решение (и применённое, и отклонённое) попадает в
+  `reports/semantics.md`, `reports/semantics.json` и в лог конвертации.
+* **Отключается одним флагом** — `brain_enabled: false`.
+
+### Что появляется в выводе
+
+```text
+reports/semantics.md     таблица «объект → что это → что применено → команды»
+reports/semantics.json   машиночитаемая версия
+reports/commands.txt     готовый список команд CraftEngine для проверки
+reports/manual-tasks.md  рекомендации, которые требуют ручного решения
+```
+
+Пример строки из лога конвертации:
+
+```text
+[INFO] BRAIN farmersdelight:iron_knife: оружие (Weapons, 100%); снаряжение: weapon (100%); тир: iron
+       commands=['/ce give @s farmersdelight:iron_knife 1', '/ce debug item farmersdelight:iron_knife']
+```
+
+### Настройки
+
+```yaml
+brain_enabled: true              # включить/выключить нейросеть целиком
+brain_min_confidence: 0.6        # порог для предметов
+brain_block_min_confidence: 0.7  # порог для блоков
+brain_log_every_object: true     # строка в логе на каждый объект
+brain_categories: true           # выбирать категорию, если нет тегов
+brain_food_detection: true       # находить еду за пределами keyword-списка
+```
+
+Те же переключатели есть в GUI на вкладке семантики.
+
+### Переобучение
+
+Датасет синтезируется детерминированно из словаря игровых и модовых
+соглашений об именовании (`converter/brain/dataset.py`) с аугментацией:
+пропуск структурных признаков, ложные флаги и бессмысленные имена, чтобы сеть
+опиралась на морфологию, а не на один признак.
+
+```bash
+python -m converter.brain.train --samples 16000 --epochs 45 --report
+```
+
+Веса сохраняются в `models/brain/`. Пространства меток в
+`converter/brain/labels.py` — часть контракта модели: менять порядок нельзя,
+нужно переобучать.

@@ -74,6 +74,13 @@ def _cmd_counter() -> "object":
 
 
 class Generator:
+    # Canonical category order, shared by the neural head and the emitter.
+    _category_names: tuple[str, ...] = (
+        "Crops", "Ingredients", "Drinks", "Food", "Meals", "Sweets",
+        "Tools", "Weapons", "Ranged", "Spears", "Tridents", "Shields",
+        "Armor", "Blocks", "Cabinets", "Items",
+    )
+
     def __init__(self, analysis: AnalysisResult, mapping: capability.MappingResult, settings: Any = None) -> None:
         self.analysis = analysis
         self.mapping = mapping
@@ -298,6 +305,22 @@ class Generator:
             return hint_rules.get(normalized)
         return None
 
+    def _category_from_brain(self, item: ItemNode) -> str | None:
+        """Neural category, used when the source provides no explicit signal.
+
+        The brain reads the whole id (head noun, qualifiers, morphology) plus
+        the structured features the analyzer collected, which generalizes to
+        vocabulary no keyword list covers. It is consulted *after* tags and
+        recipe-book hints and only above the configured confidence threshold.
+        """
+        if not getattr(self.settings, "brain_categories", True):
+            return None
+        record = (item.metadata or {}).get("brain")
+        if not isinstance(record, dict):
+            return None
+        category = (record.get("applied") or {}).get("category")
+        return category if category in self._category_names else None
+
     # --- categories -------------------------------------------------------
     def _generate_categories(self, out: GenerationResult) -> None:
         """Generate CraftEngine categories as the final generation phase.
@@ -314,9 +337,7 @@ class Generator:
         filtering pass (excluded namespaces, unresolved entries, display-only
         stages, etc.).
         """
-        names = ["Crops", "Ingredients", "Drinks", "Food", "Meals", "Sweets",
-                 "Tools", "Weapons", "Ranged", "Spears", "Tridents", "Shields",
-                 "Armor", "Blocks", "Cabinets", "Items"]
+        names = list(self._category_names)
         labels = {
             "Crops": ("crops", "Растения", "Crops", "#7CB342"),
             "Ingredients": ("ingredients", "Ингредиенты", "Ingredients", "#C9A55C"),
@@ -359,6 +380,7 @@ class Generator:
 
             tag_category = self._category_from_tags(item)
             hint_category = self._category_from_hints(item)
+            brain_category = self._category_from_brain(item)
             if tag_category:
                 g[tag_category].append(item.id)
             elif hint_category:
@@ -381,11 +403,18 @@ class Generator:
                 # Cabinets are identified before the generic block bucket.
                 g["Cabinets" if "cabinet" in path else "Blocks"].append(item.id)
             elif item.food is not None or self._is_food(item):
+                family = self._food_family(item)
                 if any(k in path for k in self.settings.drink_keywords):
                     g["Drinks"].append(item.id)
                 elif any(k in path for k in self.settings.soup_keywords) or any(k in path for k in ("stew", "chowder", "hotpot", "bisque")):
                     g["Meals"].append(item.id)
                 elif any(k in path for k in ("pie", "cookie", "cake", "cheesecake", "popsicle", "custard", "sweet")):
+                    g["Sweets"].append(item.id)
+                elif family == "drink":
+                    g["Drinks"].append(item.id)
+                elif family == "soup":
+                    g["Meals"].append(item.id)
+                elif family == "sweet":
                     g["Sweets"].append(item.id)
                 else:
                     g["Food"].append(item.id)
@@ -393,6 +422,10 @@ class Generator:
                 g["Crops"].append(item.id)
             elif any(k in path for k in ("dough", "slice", "leaf", "bark", "straw", "canvas", "patty", "cut", "minced", "chops")):
                 g["Ingredients"].append(item.id)
+            elif brain_category:
+                # Nothing in the source named this object; the network decides
+                # instead of dumping it into the generic "Items" bucket.
+                g[brain_category].append(item.id)
             else:
                 g["Items"].append(item.id)
 
@@ -559,13 +592,38 @@ class Generator:
         # when the registry id does not literally contain "soup".
         if any(token in path for token in ("stew", "chowder", "hotpot", "bisque")):
             return self.settings.soup_material
+        # Fall back to the neural food family for names no keyword covers
+        # ("ramen", "gumbo", "kombucha", …). Only the two carrier families that
+        # actually need a semantic material are honored here.
+        family = self._food_family(item)
+        if family == "soup":
+            return self.settings.soup_material
+        if family == "drink":
+            return self.settings.drink_material
         return None
 
     def _is_food(self, item: ItemNode) -> bool:
+        """Decide whether an item should receive a food component.
+
+        Order of evidence: an explicit source food component (handled by the
+        caller), then the configurable keyword list, then the neural food head.
+        The network catches edible items whose names no keyword list covers
+        ("teriyaki", "gyoza", "kombucha", …).
+        """
         if not self.settings.food_enabled:
             return False
         path = item.id.split(":")[-1].lower()
-        return any(kw in path for kw in self.settings.food_keywords)
+        if any(kw in path for kw in self.settings.food_keywords):
+            return True
+        if not getattr(self.settings, "brain_food_detection", True):
+            return False
+        candidate = (item.metadata or {}).get("food_candidate")
+        return bool(candidate and candidate != "none")
+
+    def _food_family(self, item: ItemNode) -> str | None:
+        """Neural food family (food / drink / soup / sweet), if any."""
+        candidate = (item.metadata or {}).get("food_candidate")
+        return candidate if isinstance(candidate, str) and candidate != "none" else None
 
     def _item_category(self, item: ItemNode) -> str:
         # Sort ordinary items into crops / food / items folders.
