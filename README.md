@@ -154,6 +154,15 @@ ia_emit_consumable_details: true
 Встроенный `cooldown` не переносится: в CraftEngine кулдауны именные
 (`set_cooldown` + условие `on_cooldown`), это тоже фиксируется в отчёте.
 
+### Рендер брони
+
+`armors_rendering` больше не оставляет висячую ссылку. Для каждого id
+генерируется `assets/<ns>/equipment/<id>.json`, а текстуры `layer_1`/`layer_2`
+переезжают в ванильные каталоги `textures/entity/equipment/humanoid/` и
+`.../humanoid_leggings/` — иначе `data.equippable.asset_id` ссылается в никуда и
+броня не отрисовывается. Если PNG слоёв в паке нет, ассет не выдумывается: в
+`reports/itemsadder.md` появляется строка `partial` с указанием, чего не хватает.
+
 ### Строковый NBT
 
 `nbt:` в строковой форме (`'{my-tag:"hello"}'`) разбирается собственным

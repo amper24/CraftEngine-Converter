@@ -388,6 +388,9 @@ def build() -> Path:
     _png(ns_root / "textures" / "item" / "ruby.png")
     _png(ns_root / "textures" / "item" / "ruby_sword.png")
     _png(ns_root / "textures" / "block" / "ruby_block.png")
+    # armors_rendering layer textures (IA keeps them wherever it likes).
+    _png(ns_root / "textures" / "armor" / "rubyarmor" / "layer_1.png")
+    _png(ns_root / "textures" / "armor" / "rubyarmor" / "layer_2.png")
     _write_json(ns_root / "models" / "item" / "ruby_pickaxe.json", SWORD_MODEL)
     _write_json(ns_root / "models" / "block" / "ruby_block.json", BLOCK_MODEL)
     _write_json(ns_root / "models" / "ruby_lamp.json", LAMP_MODEL)

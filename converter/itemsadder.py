@@ -23,6 +23,7 @@ equivalent is written to ``analysis.conversion_ledger`` and ends up in
 from __future__ import annotations
 
 import copy
+import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -364,6 +365,9 @@ class ItemsAdderAnalyzer:
         self._collect_categories(result)
         for ns in namespaces:
             self._build_namespace(result, ns)
+        # Needs the built items (they carry the armor_rendering metadata), so it
+        # runs after every namespace has been processed.
+        self._emit_equipment_assets(result)
         self._collect_datapack_recipes(result)
         self._link_block_items(result)
         self._link_loot(result)
@@ -416,6 +420,78 @@ class ItemsAdderAnalyzer:
         if text.startswith("display-name-") or text.startswith("lore-") or text.startswith("display-category-"):
             return table.get(text, text)
         return text
+
+    # --- armor equipment assets -------------------------------------------
+    # Vanilla resolves an equipment layer texture `<ns>:<path>` to
+    # assets/<ns>/textures/entity/equipment/<layer_type>/<path>.png, so an IA
+    # layer_1/layer_2 reference only works once the file actually lives there.
+    _EQUIP_LAYER_TYPES = {"layer_1": "humanoid", "layer_2": "humanoid_leggings"}
+
+    def _emit_equipment_assets(self, result: AnalysisResult) -> None:
+        """Write ``assets/<ns>/equipment/<id>.json`` for every armors_rendering id.
+
+        Without this file ``data.equippable.asset_id`` is a dangling reference
+        and the armor simply does not render, so the asset is generated rather
+        than left as a manual task.
+        """
+        by_asset: dict[str, dict[str, Any]] = {}
+        for node in result.items.values():
+            meta = (node.metadata or {}).get("armor_rendering")
+            if isinstance(meta, dict) and meta.get("id"):
+                by_asset.setdefault(meta["id"], {"source": meta.get("source") or {},
+                                                 "namespace": node.namespace,
+                                                 "owner": node.id})
+        for asset_id, info in sorted(by_asset.items()):
+            ns = info["namespace"]
+            rendering = info["source"] if isinstance(info["source"], dict) else {}
+            layers: dict[str, list[dict[str, Any]]] = {}
+            unresolved: list[str] = []
+            for ia_key, layer_type in self._EQUIP_LAYER_TYPES.items():
+                ref = rendering.get(ia_key)
+                if not ref:
+                    continue
+                rel = self._relocate_armor_texture(result, ns, str(ref), layer_type)
+                if rel is None:
+                    unresolved.append(ia_key)
+                    continue
+                layers.setdefault(layer_type, []).append({"texture": rel})
+            if not layers:
+                self.ledger.add(info["owner"], "item", "armors_rendering", "-", "partial",
+                                "Equipment asset needs layer_1/layer_2; none resolved, so no "
+                                "assets/%s/equipment/%s.json was generated." % (ns, asset_id.split(":", 1)[1]))
+                continue
+            result.generated_assets[f"assets/{ns}/equipment/{asset_id.split(':', 1)[1]}.json"] = (
+                json.dumps({"layers": layers}, indent=2, ensure_ascii=False) + "\n")
+            note = "Generated assets/%s/equipment/%s.json" % (ns, asset_id.split(":", 1)[1])
+            if unresolved:
+                note += "; unresolved: " + ", ".join(unresolved)
+            self.ledger.add(info["owner"], "item", "armors_rendering",
+                            "data.equippable.asset_id + equipment asset", "direct", note)
+
+    def _relocate_armor_texture(self, result: AnalysisResult, ns: str, ref: str,
+                                layer_type: str) -> str | None:
+        """Point an IA armor layer at a vanilla equipment texture path.
+
+        Returns the resource location for the equipment asset, or ``None`` when
+        the texture cannot be found in the pack. The existing ``resource_map``
+        entry is rewritten in place so the driver copies the file to its new
+        home instead of the ItemsAdder one.
+        """
+        ref = ref.strip()
+        if ref.endswith(".png"):
+            ref = ref[:-4]
+        wanted = ref.split(":", 1)[-1].lstrip("/")
+        for src, dest in list(result.resource_map.items()):
+            if not dest.startswith(f"assets/{ns}/textures/"):
+                continue
+            tail = dest[len(f"assets/{ns}/textures/"):]
+            if tail[:-4] != wanted and not tail.endswith("/" + wanted + ".png"):
+                continue
+            new_dest = f"assets/{ns}/textures/entity/equipment/{layer_type}/{wanted}.png"
+            result.resource_map[src] = new_dest
+            self._resource_index[new_dest] = src
+            return f"{ns}:{wanted}"
+        return None
 
     # --- resources --------------------------------------------------------
     def _collect_resources(self, result: AnalysisResult) -> None:

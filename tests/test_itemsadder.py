@@ -470,6 +470,62 @@ class ItemsAdderArchiveTests(unittest.TestCase):
         self.assertEqual(diffs.right_only, [])
 
 
+class ItemsAdderEquipmentAssetTests(unittest.TestCase):
+    """`data.equippable.asset_id` must not be a dangling reference."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.pack = build_fixture()
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.out = Path(cls.tmp.name) / "converted"
+        settings = Settings()
+        settings.write_conversion_log = False
+        cls.result = driver.convert(cls.pack, cls.out, settings=settings, source="itemsadder")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_equipment_asset_is_generated(self):
+        path = self.out / "resourcepack" / "assets" / NS / "equipment" / "rubyarmor.json"
+        self.assertTrue(path.exists(), "armors_rendering must produce an equipment asset")
+        import json
+        asset = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(asset["layers"]["humanoid"][0]["texture"], f"{NS}:armor/rubyarmor/layer_1")
+        self.assertEqual(asset["layers"]["humanoid_leggings"][0]["texture"],
+                         f"{NS}:armor/rubyarmor/layer_2")
+
+    def test_layer_textures_are_moved_to_the_vanilla_paths(self):
+        """An equipment texture id resolves under textures/entity/equipment/<layer_type>/."""
+        for layer_type, name in (("humanoid", "layer_1"), ("humanoid_leggings", "layer_2")):
+            path = (self.out / "resourcepack" / "assets" / NS / "textures" / "entity" /
+                    "equipment" / layer_type / "armor" / "rubyarmor" / f"{name}.png")
+            self.assertTrue(path.exists(), path)
+
+    def test_asset_id_reference_resolves(self):
+        """The id in the item config must point at a file that exists."""
+        cfg = _load(self.out / "configuration" / "items" / NS / "ruby_helmet.yml")
+        asset_id = cfg["items"][f"{NS}:ruby_helmet"]["data"]["equippable"]["asset_id"]
+        ns, name = asset_id.split(":", 1)
+        self.assertTrue((self.out / "resourcepack" / "assets" / ns / "equipment" / f"{name}.json").exists(),
+                        f"{asset_id} is dangling")
+
+    def test_missing_layer_textures_are_reported_not_silently_ignored(self):
+        """A pack without the layer PNGs gets a ledger row, not a broken asset."""
+        import shutil
+        stripped = self.tmp.name + "/stripped"
+        if Path(stripped).exists():
+            shutil.rmtree(stripped)
+        shutil.copytree(self.pack, stripped)
+        for name in ("layer_1.png", "layer_2.png"):
+            (Path(stripped) / "contents" / NS / "textures" / "armor" / "rubyarmor" / name).unlink()
+        out = Path(self.tmp.name) / "out_stripped"
+        driver.convert(Path(stripped), out, settings=Settings(), source="itemsadder")
+        self.assertFalse((out / "resourcepack" / "assets" / NS / "equipment" / "rubyarmor.json").exists())
+        report = (out / "reports" / "itemsadder.md").read_text(encoding="utf-8")
+        self.assertIn("none resolved", report)
+
+
 class ItemsAdderSnbtTests(unittest.TestCase):
     def test_string_nbt_is_parsed_into_components(self):
         parsed = itemsadder._parse_snbt('{my-tag:"hello", another:"useless"}')

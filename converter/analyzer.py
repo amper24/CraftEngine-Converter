@@ -60,6 +60,9 @@ class AnalysisResult:
     # copy ``assets/**`` verbatim and leave this empty; ItemsAdder packs keep
     # their resources under ``contents/<ns>/...`` and need a rewrite.
     resource_map: dict[str, str] = field(default_factory=dict)
+    # Assets the converter synthesizes rather than copies, keyed by their
+    # resourcepack-relative path (e.g. assets/<ns>/equipment/<id>.json).
+    generated_assets: dict[str, str] = field(default_factory=dict)
     # Row-per-key conversion ledger written to reports/<source>.md.
     conversion_ledger: list[dict[str, Any]] = field(default_factory=list)
 
@@ -85,6 +88,7 @@ class AnalysisResult:
             "content_namespaces": list(self.content_namespaces),
             "source_categories": self.source_categories,
             "resource_map": dict(sorted(self.resource_map.items())),
+            "generated_assets": dict(sorted(self.generated_assets.items())),
             "conversion_ledger": self.conversion_ledger,
             "warnings": self.warnings,
         }

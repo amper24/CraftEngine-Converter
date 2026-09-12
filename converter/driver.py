@@ -218,6 +218,11 @@ class ConversionDriver:
         """
         rp_dir = self.output_dir / "resourcepack"
 
+        # Assets the converter synthesized (e.g. armor equipment assets). These
+        # are written first so a verbatim source copy can never shadow them.
+        for name, text in sorted(getattr(analysis, "generated_assets", {}).items()):
+            self._write_copied_asset(rp_dir, name, text.encode("utf-8"))
+
         # Sources that do not already store their resources under ``assets/``
         # (ItemsAdder keeps them under ``contents/<ns>/``) publish an explicit
         # archive-path -> resourcepack-path map. That map is authoritative.
