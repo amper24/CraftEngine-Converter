@@ -42,10 +42,11 @@ def _ledger_rows(out: Path) -> list[dict]:
         if not line.startswith("|") or line.startswith("| ---") or "Object" in line:
             continue
         cells = [c.strip().strip("`") for c in line.strip("|").split("|")]
-        if len(cells) != 4:
+        # Object | Source key | CraftEngine target | Support | Note
+        if len(cells) != 5:
             continue
         rows.append({"object_id": cells[0], "source_key": cells[1],
-                     "target": cells[2], "support": cells[3]})
+                     "target": cells[2], "support": cells[3], "note": cells[4]})
     return rows
 
 
@@ -113,9 +114,9 @@ class ItemsAdderConversionTests(unittest.TestCase):
         self.assertEqual(self.result["diagnostics"], 0)
 
     def test_source_kind_is_recorded(self):
-        self.assertEqual(self.result["counts"]["items"], 10)
+        self.assertEqual(self.result["counts"]["items"], 11)
         self.assertEqual(self.result["counts"]["blocks"], 1)
-        self.assertEqual(self.result["counts"]["furniture"], 1)
+        self.assertEqual(self.result["counts"]["furniture"], 2)
         self.assertEqual(self.result["counts"]["recipes"], 1)
         self.assertEqual(self.result["counts"]["loot"], 1)
 
@@ -439,7 +440,7 @@ class ItemsAdderArchiveTests(unittest.TestCase):
         result = driver.convert(zip_path, out, settings=Settings(), source="itemsadder")
         self.assertTrue(result["validation"]["valid"], result["validation"])
         self.assertEqual(result["fidelity"]["issues"], [])
-        self.assertEqual(result["counts"]["items"], 10)
+        self.assertEqual(result["counts"]["items"], 11)
 
     def test_zip_with_a_wrapper_directory_is_still_detected(self):
         import shutil
@@ -527,6 +528,47 @@ class ItemsAdderEquipmentAssetTests(unittest.TestCase):
         self.assertFalse((out / "resourcepack" / "assets" / NS / "equipment" / "rubyarmor.json").exists())
         report = (out / "reports" / "itemsadder.md").read_text(encoding="utf-8")
         self.assertIn("none resolved", report)
+
+
+class ItemsAdderFurnitureSitTests(unittest.TestCase):
+    """`behaviours.furniture_sit` -> CraftEngine hitbox `seats` (seatable furniture)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.out = Path(cls.tmp.name) / "converted"
+        settings = Settings()
+        settings.write_conversion_log = False
+        driver.convert(build_fixture(), cls.out, settings=settings, source="itemsadder")
+        cls.furn = _load(cls.out / "configuration" / "furniture" / NS / "ruby_cushion.yml")[
+            "furniture"][f"{NS}:ruby_cushion"]
+        cls.report = (cls.out / "reports" / "itemsadder.md").read_text(encoding="utf-8")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_seat_is_emitted_on_the_hitbox(self):
+        hitbox = self.furn["variants"]["ground"]["hitboxes"][0]
+        self.assertEqual(hitbox["seats"], ["0,0.5,0"])
+
+    def test_seat_height_comes_from_the_source(self):
+        # sit_height: 0.5 in the fixture must be the y of the seat position.
+        self.assertIn("0,0.5,0", self.furn["variants"]["ground"]["hitboxes"][0]["seats"][0])
+
+    def test_hitbox_stays_interactive(self):
+        hitbox = self.furn["variants"]["ground"]["hitboxes"][0]
+        self.assertTrue(hitbox["interactive"])
+
+    def test_sit_all_solid_blocks_is_reported_as_having_no_equivalent(self):
+        self.assertIn("sit_all_solid_blocks", self.report)
+        self.assertIn("no CraftEngine", self.report)
+
+    def test_furniture_is_still_bound_to_its_item(self):
+        item = _load(self.out / "configuration" / "items" / NS / "ruby_cushion.yml")["items"][
+            f"{NS}:ruby_cushion"]
+        self.assertEqual(item["behavior"]["type"], "furniture_item")
+        self.assertEqual(item["behavior"]["furniture"], f"{NS}:ruby_cushion")
 
 
 class ItemsAdderCustomVariantsTests(unittest.TestCase):

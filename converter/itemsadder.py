@@ -1459,7 +1459,9 @@ class ItemsAdderAnalyzer:
         furniture_cfg = behaviours.get("furniture") or specific.get("furniture")
         if isinstance(furniture_cfg, dict):
             if getattr(self.settings, "ia_generate_furniture", True):
-                self._build_furniture(result, node, full_id, ns, raw, furniture_cfg)
+                self._build_furniture(result, node, full_id, ns, raw, furniture_cfg,
+                                      behaviours.get("furniture_sit")
+                                      or specific.get("furniture_sit"))
             else:
                 # Opted out, so say so in the ledger instead of dropping it.
                 self.ledger.add(full_id, "furniture", "behaviours.furniture", "-", "unsupported",
@@ -1497,7 +1499,7 @@ class ItemsAdderAnalyzer:
 
         for key in behaviours:
             if key in ("block", "furniture", "compostable", "hat", "fire_resistant", "music_disc",
-                       "book"):
+                       "book", "furniture_sit"):
                 continue
             spec = self.behaviour_map.get(str(key), {})
             self.ledger.add(
@@ -1685,6 +1687,7 @@ class ItemsAdderAnalyzer:
         ns: str,
         raw: dict[str, Any],
         cfg: dict[str, Any],
+        sit_cfg: Any = None,
     ) -> None:
         """Translate an ItemsAdder furniture into a CraftEngine furniture.
 
@@ -1742,6 +1745,21 @@ class ItemsAdderAnalyzer:
         if cfg.get("solid") is True:
             hitbox["interaction_entity"] = True
         self.ledger.add(full_id, "furniture", "hitbox", "variants.*.hitboxes", "transform")
+
+        # `behaviours.furniture_sit` makes the furniture rideable. CraftEngine
+        # expresses that as `seats` on a hitbox: "x,y,z" plus an optional yaw
+        # after a space (with yaw the player's body rotation is limited).
+        if isinstance(sit_cfg, dict) or sit_cfg is True:
+            props = sit_cfg if isinstance(sit_cfg, dict) else {}
+            height = props.get("sit_height")
+            seat = f"0,{float(height) if height is not None else 0.0},0"
+            hitbox["seats"] = [seat]
+            note = f"Seat at {seat}; CraftEngine takes seat yaw from the placed furniture."
+            if props.get("sit_all_solid_blocks"):
+                note += (" IA `sit_all_solid_blocks` (sit on any solid block) has no CraftEngine"
+                         " equivalent - the seat belongs to this furniture only.")
+            self.ledger.add(full_id, "furniture", "behaviours.furniture_sit",
+                            "variants.*.hitboxes[].seats", "transform", note)
 
         variants: dict[str, Any] = {}
         placeable = cfg.get("placeable_on") if isinstance(cfg.get("placeable_on"), dict) else {}
@@ -2255,9 +2273,11 @@ def conversion_report(analysis: AnalysisResult) -> str:
 
     lines.append("## Full ledger")
     lines.append("")
-    lines.append("| Object | Source key | CraftEngine target | Support |")
-    lines.append("| --- | --- | --- | --- |")
+    lines.append("| Object | Source key | CraftEngine target | Support | Note |")
+    lines.append("| --- | --- | --- | --- | --- |")
     for row in sorted(rows, key=lambda r: (r.domain, r.object_id, r.source_key)):
-        lines.append(f"| `{row.object_id}` | `{row.source_key}` | `{row.target}` | {row.support} |")
+        lines.append("| `{}` | `{}` | `{}` | {} | {} |".format(
+            row.object_id, row.source_key, row.target, row.support,
+            row.note.replace("|", "\\|")))
     lines.append("")
     return "\n".join(lines)

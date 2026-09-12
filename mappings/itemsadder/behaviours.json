@@ -95,6 +95,11 @@
       "support": "unsupported",
       "target": null,
       "note": "CraftEngine has no thrown-spear behavior; the melee side survives as a normal item."
+    },
+    "furniture_sit": {
+      "support": "transform",
+      "target": "variants.*.hitboxes[].seats",
+      "note": "Seating becomes a CraftEngine hitbox seat; sit_all_solid_blocks has no equivalent."
     }
   },
   "specific_properties": {
@@ -176,6 +181,11 @@
     "fishing_rod": {
       "support": "direct",
       "note": "Handled by the vanilla fishing_rod material plus the item model."
+    },
+    "furniture_sit": {
+      "support": "transform",
+      "target": "variants.*.hitboxes[].seats",
+      "note": "Seating becomes a CraftEngine hitbox seat; sit_all_solid_blocks has no equivalent."
     }
   },
   "item_keys": {

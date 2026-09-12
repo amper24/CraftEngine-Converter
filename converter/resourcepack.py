@@ -324,9 +324,11 @@ def conversion_report(analysis: AnalysisResult) -> str:
                 row.get("support", ""), row.get("note", "")))
 
     lines += ["", "## Full ledger", "",
-              "| Object | Source key | CraftEngine target | Support |", "| --- | --- | --- | --- |"]
+              "| Object | Source key | CraftEngine target | Support | Note |",
+              "| --- | --- | --- | --- | --- |"]
     for row in sorted(rows, key=lambda r: (r.get("object", ""), r.get("source_key", ""))):
-        lines.append("| `{}` | `{}` | `{}` | {} |".format(
+        lines.append("| `{}` | `{}` | `{}` | {} | {} |".format(
             row.get("object", ""), row.get("source_key", ""),
-            row.get("target", ""), row.get("support", "")))
+            row.get("target", ""), row.get("support", ""),
+            str(row.get("note", "")).replace("|", "\\|")))
     return "\n".join(lines) + "\n"

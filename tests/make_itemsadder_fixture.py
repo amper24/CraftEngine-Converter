@@ -221,6 +221,29 @@ items:
       bow:
         draw_speed: 1.5
 
+  ruby_cushion:
+    display_name: Ruby Cushion
+    resource:
+      material: PAPER
+      generate: false
+      model_path: item/ruby_cushion
+    behaviours:
+      furniture:
+        entity: armor_stand
+        small: true
+        solid: true
+        hitbox:
+          length: 1
+          width: 1
+          height: 0.5
+        placeable_on:
+          walls: false
+          ceiling: false
+          floor: true
+      furniture_sit:
+        sit_height: 0.5
+        sit_all_solid_blocks: true
+
   ruby_apple:
     display_name: Ruby Apple
     resource:
@@ -436,6 +459,10 @@ def build() -> Path:
     (ns_root / "sounds" / "misc" / "ruby_chime.ogg").write_bytes(b"OggS")
     (ns_root / "sounds" / "ruby_thud.ogg").write_bytes(b"OggS")
     _write_json(ns_root / "models" / "item" / "ruby_pickaxe.json", SWORD_MODEL)
+    _write_json(ns_root / "models" / "item" / "ruby_cushion.json", {
+        "parent": "minecraft:item/generated",
+        "textures": {"layer0": f"{NS}:item/ruby"},
+    })
     _write_json(ns_root / "models" / "block" / "ruby_block.json", BLOCK_MODEL)
     _write_json(ns_root / "models" / "ruby_lamp.json", LAMP_MODEL)
 
