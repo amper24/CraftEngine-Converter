@@ -193,6 +193,51 @@ CraftEngine 26.8 нет ключа-списка снарядов, поэтому
 парсером SNBT и раскладывается в `data.components`. То, что парсер не понимает
 полностью, отдаётся человеку через отчёт — догадок не подставляется.
 
+## Режим «ресурс-пак → CraftEngine»
+
+Конвертер умеет брать **обычный ресурспак** и генерировать конфиги из того, что
+в нём уже нарисовано: `assets/<ns>/models/item/*.json` и
+`assets/<ns>/textures/item/*.png`. Художнику не нужно писать по YAML на каждую
+текстуру.
+
+```bash
+python -m converter convert path/to/resourcepack --output out --source resourcepack
+```
+
+`--source auto` (значение по умолчанию) выбирает формат по убыванию
+специфичности: мод-JAR (есть метаданные загрузчика) → ItemsAdder (`contents/`) →
+ресурспак (`assets/`). Это важно, потому что и мод, и пак ItemsAdder тоже
+содержат `assets/`.
+
+### Что во что превращается
+
+| В ресурспаке | В CraftEngine |
+| --- | --- |
+| только текстура | `texture: <ns>:item/<name>` — модель генерирует CraftEngine |
+| есть `models/item/<name>.json` | `model: <ns>:item/<name>`, **без** блока `generation` |
+| текстура с «инструментальным» именем (`_sword`, `_pickaxe`, …) | `generation.parent: minecraft:item/handheld` |
+| `lang/en_us.json` → `item.<ns>.<name>` | `data.item_name` |
+
+Правило про `generation` принципиальное: блок `generation` рядом с настоящим
+`.json` модели переопределяет авторскую модель, поэтому он добавляется только
+там, где модели в паке нет.
+
+### Что не конвертируется и почему
+
+- `assets/<ns>/models/block/*.json` — для блока нужен конфиг CraftEngine со
+  states, из одной модели он не выводится;
+- `assets/minecraft/` — это переопределение ванильных предметов, а не новый
+  контент.
+
+Оба случая попадают в `reports/resourcepack.md`, а не исчезают.
+
+### Настройки
+
+| Ключ | По умолчанию | Смысл |
+| --- | --- | --- |
+| `rp_default_material` | `nether_brick` | Материал для всех предметов: в ресурспаке его нет, а CraftEngine иначе молча подставит свой |
+| `rp_skip_vanilla_overrides` | `true` | Не создавать предметы из `assets/minecraft/` |
+
 ## Структура
 
 ```text

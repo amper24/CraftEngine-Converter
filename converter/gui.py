@@ -74,7 +74,7 @@ class App:
         ttk.Combobox(
             controls,
             textvariable=self.source_var,
-            values=["auto", "mod", "itemsadder"],
+            values=["auto", "mod", "itemsadder", "resourcepack"],
             width=12,
             state="readonly",
         ).pack(side="left", padx=(5, 18))

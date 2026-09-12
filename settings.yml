@@ -180,3 +180,16 @@ ia_generate_furniture: true
 ia_default_locale: en
 # Переносить consume_seconds / sound / animation из consumable.
 ia_emit_consumable_details: true
+
+# --- Режим «ресурс-пак -> CraftEngine» -------------------------------------
+# Конвертер может взять обычный ресурспак и сгенерировать конфиги из найденных
+# assets/<ns>/models/item/*.json и assets/<ns>/textures/item/*.png.
+
+# В ресурспаке нет материала, поэтому каждому предмету нужен дефолтный.
+# CraftEngine иначе молча подставит nether_brick.
+rp_default_material: nether_brick
+
+# assets/minecraft/ - это переопределение ванильных предметов, а не новый
+# контент. По умолчанию такие ассеты копируются в пак, но предметы из них не
+# создаются (фиксируется в reports/resourcepack.md).
+rp_skip_vanilla_overrides: true

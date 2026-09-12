@@ -32,7 +32,7 @@ def build_parser() -> argparse.ArgumentParser:
     analyze_p.add_argument(
         "--source",
         default="auto",
-        choices=("auto", "mod", "itemsadder"),
+        choices=("auto", "mod", "itemsadder", "resourcepack"),
         help="input format: a mod jar/dir, or an ItemsAdder contents/ pack",
     )
 
@@ -44,7 +44,7 @@ def build_parser() -> argparse.ArgumentParser:
     convert_p.add_argument(
         "--source",
         default="auto",
-        choices=("auto", "mod", "itemsadder"),
+        choices=("auto", "mod", "itemsadder", "resourcepack"),
         help="input format: a mod jar/dir, or an ItemsAdder contents/ pack",
     )
 

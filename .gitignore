@@ -20,3 +20,4 @@ Thumbs.db
 # Brain training artifacts (weights themselves ARE tracked)
 models/brain/training_report.json
 tests/itemsadder_fixture/
+tests/resourcepack_fixture/

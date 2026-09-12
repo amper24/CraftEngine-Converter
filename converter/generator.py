@@ -170,6 +170,12 @@ class Generator:
             # it would silently change the item, so it is preserved - including
             # for block items, where the mod path deliberately omits material.
             body["material"] = item.base_material
+        elif item.base_material and self.source_kind == "resourcepack":
+            # A resource pack carries no material at all, so the configured
+            # default is what makes the item behave predictably. Without this
+            # CraftEngine silently falls back to nether_brick and the
+            # rp_default_material setting would do nothing.
+            body["material"] = item.base_material
 
         # CraftEngine's model system is the source of truth. For 1.21.4+
         # packs, configure `model`/`texture` and let CraftEngine generate the

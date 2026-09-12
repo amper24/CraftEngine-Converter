@@ -6,7 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from . import __version__, analyzer, capability, generator, itemsadder, packager, semantics, validator, util, fidelity, status
+from . import __version__, analyzer, capability, generator, itemsadder, packager, resourcepack, semantics, validator, util, fidelity, status
 from .archive import ModArchive, open_archive
 from .config import Settings, load_settings
 from .sliceboard import generate_sliceboard
@@ -26,7 +26,20 @@ def detect_source_kind(archive: ModArchive, log: Log, mode: str = "auto") -> str
             log.warn("source_mode=itemsadder but no ItemsAdder content found; falling back to the mod adapter")
             return "mod"
         return "itemsadder"
-    return "itemsadder" if itemsadder.detect_itemsadder(archive, log) is not None else "mod"
+    if mode == "resourcepack":
+        if resourcepack.detect_resourcepack(archive, log) is None:
+            log.warn("source_mode=resourcepack but no assets/<ns>/ item models or textures found; "
+                     "falling back to the mod adapter")
+            return "mod"
+        return "resourcepack"
+    if any(archive.exists(n) for n in ("fabric.mod.json", "quilt.mod.json")) or any(
+            n.endswith("mods.toml") for n in archive.names):
+        return "mod"
+    if itemsadder.detect_itemsadder(archive, log) is not None:
+        return "itemsadder"
+    if resourcepack.detect_resourcepack(archive, log) is not None:
+        return "resourcepack"
+    return "mod"
 
 
 
@@ -63,6 +76,11 @@ class ConversionDriver:
                 ia_layout = itemsadder.detect_itemsadder(archive, self.log)
                 ia_analyzer = itemsadder.ItemsAdderAnalyzer(self.log, self.minecraft_version, settings)
                 analysis = ia_analyzer.analyze(archive, ia_layout)
+            elif source_kind == "resourcepack":
+                self.log.phase("ANALYZE", "Анализ ресурс-пака (models/ + textures/)")
+                rp_layout = resourcepack.detect_resourcepack(archive, self.log)
+                rp_analyzer = resourcepack.ResourcePackAnalyzer(self.log, self.minecraft_version, settings)
+                analysis = rp_analyzer.analyze(archive, rp_layout)
             else:
                 self.log.phase("ANALYZE", "Анализ исходного мода")
                 analysis = analyzer.analyze_archive(archive, self.log, self.minecraft_version, settings)
@@ -88,7 +106,7 @@ class ConversionDriver:
             # Generate SliceBoard integration package outside configuration so CraftEngine does not parse its DSL as CE recipes.
             # ItemsAdder packs never carry cutting-board recipes, so the
             # SliceBoard pass is skipped for that source.
-            if source_kind != "itemsadder":
+            if source_kind == "mod":
                 for sb_file in generate_sliceboard(analysis, settings):
                     generation.files.append(sb_file)
                 for warning in getattr(analysis, "sliceboard_warnings", []):
@@ -147,6 +165,10 @@ class ConversionDriver:
             if analysis.source_kind == "itemsadder":
                 (report_dir / "itemsadder.md").write_text(
                     itemsadder.conversion_report(analysis), encoding="utf-8"
+                )
+            elif analysis.source_kind == "resourcepack":
+                (report_dir / "resourcepack.md").write_text(
+                    resourcepack.conversion_report(analysis), encoding="utf-8"
                 )
 
             source_hash = util.sha256_file(self.input_path) if self.input_path.is_file() else "directory"
