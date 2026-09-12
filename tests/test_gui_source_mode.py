@@ -214,3 +214,56 @@ def test_gui_falls_back_to_namespace_dialog_for_mods():
         assert shown[0]["mod"]["namespace"] == "farmersdelight"
     finally:
         gui_module.threading.Thread = original_thread  # type: ignore[attr-defined]
+
+
+def test_gui_reports_resourcepack_layout_and_skips_namespace_dialog():
+    """A resource pack has no external recipe namespaces to resolve."""
+    _install_fake_tkinter()
+    sys.path.insert(0, str(ROOT / "tests"))
+    from make_resourcepack_fixture import build as build_rp
+
+    pack = build_rp()
+
+    from converter import gui as gui_module
+    from converter.config import Settings
+
+    app = gui_module.App.__new__(gui_module.App)
+    app.root = _Widget()
+    app.settings_manager = type("M", (), {"settings": Settings(), "save": lambda self, s: None})()
+    app.settings = app.settings_manager.settings
+    app.mod_var = _Var(str(pack))
+    app.out_var = _Var("")
+    app.minecraft_var = _Var("1.21.4")
+    app.ce_var = _Var("26.8")
+    app.source_var = _Var("auto")
+    app.interactive_var = _Var(True)
+    app.strict_var = _Var(False)
+    app.sliceboard_var = _Var(True)
+    app.status_var = _Var("")
+    app.counts_var = _Var("")
+    app.progress = _Widget()
+    app.log = _Widget()
+    app.last_output = None
+
+    logged: list[str] = []
+    app._log = lambda text: logged.append(text)  # type: ignore[method-assign]
+
+    started = []
+    app._start_conversion = lambda: started.append(True)  # type: ignore[method-assign]
+    # If the mod branch were taken, this dialog would be opened.
+    shown = []
+    app._show_mapping_then_convert = lambda *a, **kw: shown.append((a, kw))  # type: ignore[method-assign]
+
+    from converter import driver
+
+    info = driver.describe_source(str(pack), app.settings)
+    assert info["kind"] == "resourcepack"
+    app._on_source_described(info, convert=True)
+
+    text = "\n".join(logged)
+    assert "ресурс-пак" in text, text
+    assert "gemworks" in text, text
+    assert "vanilla" in text.lower() or "ванил" in text.lower(), text
+    # Conversion starts directly; the namespace dialog is never opened.
+    assert started == [True]
+    assert shown == []

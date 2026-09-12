@@ -332,6 +332,9 @@ def describe_source(input_path: str | Path, settings: Settings | None = None, ve
         if kind == "itemsadder":
             layout = itemsadder.detect_itemsadder(archive, log)
             info["itemsadder"] = layout.to_dict() if layout else None
+        elif kind == "resourcepack":
+            layout = resourcepack.detect_resourcepack(archive, log)
+            info["resourcepack"] = layout.to_dict() if layout else None
         else:
             from .detector import ModDetector
 

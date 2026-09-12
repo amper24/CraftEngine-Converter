@@ -192,6 +192,29 @@ class App:
                 self._start_conversion()
             return
 
+        if kind == "resourcepack":
+            # A resource pack has no external recipe namespaces either, so the
+            # SliceBoard dialog would only ask a meaningless question.
+            self.progress.stop()
+            self.status_var.set("Ресурс-пак распознан")
+            layout = (info.get("resourcepack") or {})
+            namespaces = layout.get("namespaces", {})
+            overrides = layout.get("vanilla_overrides", {})
+            self._log("Формат: ресурс-пак (assets/)")
+            self._log(f"Namespace'ов: {len(namespaces)}")
+            for ns, detail in sorted(namespaces.items()):
+                self._log(
+                    f"  {ns}: моделей {len(detail.get('item_models', []))}, "
+                    f"текстур {len(detail.get('item_textures', []))}, "
+                    f"блоковых моделей {len(detail.get('block_models', []))}"
+                )
+            if overrides:
+                self._log(f"Переопределений ванили (assets/minecraft/): {len(overrides)} namespace(ов) — "
+                          f"предметы из них не создаются")
+            if convert:
+                self._start_conversion()
+            return
+
         # Mod path: keep the existing namespace-resolution preflight.
         mod = self.mod_var.get().strip()
 
