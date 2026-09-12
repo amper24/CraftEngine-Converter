@@ -255,6 +255,18 @@ python -m converter convert path/to/resourcepack --output out --source resourcep
 | `rp_default_material` | `nether_brick` | Материал для всех предметов: в ресурспаке его нет, а CraftEngine иначе молча подставит свой |
 | `rp_skip_vanilla_overrides` | `true` | Не создавать предметы из `assets/minecraft/` |
 
+## Тесты
+
+```bash
+.venv/bin/python -m pytest tests -q
+```
+
+Часть тестов байткода требует внешний мод
+`mod-for-tests/VeggiesDelight-1.21.1-1.9.3.jar` (в репозитории его нет — он
+слишком большой). Без него они **пропускаются** с явной причиной, а не падают:
+падение должно означать поломку, а не отсутствие необязательного файла. Чтобы
+запустить их, положите jar в `mod-for-tests/`.
+
 ## Структура
 
 ```text

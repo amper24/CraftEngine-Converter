@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 import sys
 import yaml
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -17,6 +18,7 @@ if not FIXTURE.exists():
     FIXTURE = Path('/mnt/data/dev/mod-for-tests/VeggiesDelight-1.21.1-1.9.3.jar')
 
 
+@pytest.mark.skipif(not FIXTURE.exists(), reason="requires the external mod fixture mod-for-tests/VeggiesDelight-1.21.1-1.9.3.jar, which is not in this repository (see README)")
 class QualityTests(unittest.TestCase):
     def test_namespace_suggestions_ignore_compatibility_tags(self):
         result = suggest_namespace_mappings(FIXTURE, '1.21.1', Settings())

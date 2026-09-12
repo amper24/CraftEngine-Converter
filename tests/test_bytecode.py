@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
@@ -13,7 +15,7 @@ FIXTURE = Path('/mnt/data/dev/mod-for-tests/VeggiesDelight-1.21.1-1.9.3.jar')
 
 def test_neoforge_foodproperties_extraction():
     if not FIXTURE.exists():
-        return
+        pytest.skip("requires the external mod fixture mod-for-tests/VeggiesDelight-1.21.1-1.9.3.jar, which is not in this repository (see README)")
     with open_archive(FIXTURE, Log()) as archive:
         foods = extract_foods_from_archive(archive)
     assert len(foods) >= 60

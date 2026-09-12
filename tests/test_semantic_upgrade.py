@@ -2,12 +2,16 @@ import json
 from pathlib import Path
 import tempfile
 
+import pytest
+
 from converter.archive import open_archive
 from converter.analyzer import Analyzer
 from converter.config import Settings
 from converter.util import Log
 
 FIXTURE = Path(__file__).resolve().parents[1] / "mod-for-tests" / "VeggiesDelight-1.21.1-1.9.3.jar"
+
+pytestmark = pytest.mark.skipif(not FIXTURE.exists(), reason="requires the external mod fixture mod-for-tests/VeggiesDelight-1.21.1-1.9.3.jar, which is not in this repository (see README)")
 
 def test_model_helpers_are_internal_display_items_only():
     settings=Settings()
