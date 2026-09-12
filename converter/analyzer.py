@@ -17,7 +17,7 @@ from .detector import ModMetadata, ModDetector
 from .bytecode import extract_foods_from_archive, FoodValue, extract_crop_relations_from_archive
 from .modeldefs import translate_item_model_definition
 from .bytecode_semantics import extract_semantics_from_archive
-from .ir import BlockNode, BlockStateNode, ItemNode, LootNode, RecipeNode, ResourceNode
+from .ir import BlockNode, BlockStateNode, FurnitureNode, ItemNode, LootNode, RecipeNode, ResourceNode
 from .util import Log
 
 
@@ -47,12 +47,33 @@ class AnalysisResult:
     # Filled by converter.semantics after analysis (neural verdicts per object).
     semantics: Any = None
 
+    # --- source-adapter extensions ---------------------------------------
+    # Which import adapter produced this IR: "mod" (Forge/Fabric/NeoForge jar)
+    # or "itemsadder" (ItemsAdder contents/ pack).
+    source_kind: str = "mod"
+    # Entity-based decorations. Empty for mod sources.
+    furniture: dict[str, "FurnitureNode"] = field(default_factory=dict)
+    # Explicit source categories (namespace -> category id -> definition).
+    # When present, category generation uses these instead of inferring groups.
+    source_categories: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # Archive path -> path relative to the output resourcepack root. Mod sources
+    # copy ``assets/**`` verbatim and leave this empty; ItemsAdder packs keep
+    # their resources under ``contents/<ns>/...`` and need a rewrite.
+    resource_map: dict[str, str] = field(default_factory=dict)
+    # Assets the converter synthesizes rather than copies, keyed by their
+    # resourcepack-relative path (e.g. assets/<ns>/equipment/<id>.json).
+    generated_assets: dict[str, str] = field(default_factory=dict)
+    # Row-per-key conversion ledger written to reports/<source>.md.
+    conversion_ledger: list[dict[str, Any]] = field(default_factory=list)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "metadata": self.metadata.to_dict(),
             "minecraft_version": self.minecraft_version,
+            "source_kind": self.source_kind,
             "items": {k: v.to_dict() for k, v in sorted(self.items.items())},
             "blocks": {k: v.to_dict() for k, v in sorted(self.blocks.items())},
+            "furniture": {k: v.to_dict() for k, v in sorted(self.furniture.items())},
             "recipes": {k: v.to_dict() for k, v in sorted(self.recipes.items())},
             "loot": {k: v.to_dict() for k, v in sorted(self.loot.items())},
             "resources": [r.to_dict() for r in self.resources],
@@ -65,6 +86,10 @@ class AnalysisResult:
             "bytecode_semantics": dict(sorted(self.bytecode_semantics.items())),
             "bytecode_crops": dict(sorted(self.bytecode_crops.items())),
             "content_namespaces": list(self.content_namespaces),
+            "source_categories": self.source_categories,
+            "resource_map": dict(sorted(self.resource_map.items())),
+            "generated_assets": dict(sorted(self.generated_assets.items())),
+            "conversion_ledger": self.conversion_ledger,
             "warnings": self.warnings,
         }
 

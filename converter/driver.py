@@ -6,11 +6,41 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from . import __version__, analyzer, capability, generator, packager, semantics, validator, util, fidelity, status
+from . import __version__, analyzer, capability, generator, itemsadder, packager, resourcepack, semantics, validator, util, fidelity, status
 from .archive import ModArchive, open_archive
 from .config import Settings, load_settings
 from .sliceboard import generate_sliceboard
 from .util import Log
+
+
+def detect_source_kind(archive: ModArchive, log: Log, mode: str = "auto") -> str:
+    """Decide which import adapter handles this input.
+
+    ``mode`` can force the choice; ``auto`` prefers ItemsAdder when the archive
+    is an ItemsAdder content pack and falls back to the mod adapter otherwise.
+    """
+    if mode == "mod":
+        return "mod"
+    if mode == "itemsadder":
+        if itemsadder.detect_itemsadder(archive, log) is None:
+            log.warn("source_mode=itemsadder but no ItemsAdder content found; falling back to the mod adapter")
+            return "mod"
+        return "itemsadder"
+    if mode == "resourcepack":
+        if resourcepack.detect_resourcepack(archive, log) is None:
+            log.warn("source_mode=resourcepack but no assets/<ns>/ item models or textures found; "
+                     "falling back to the mod adapter")
+            return "mod"
+        return "resourcepack"
+    if any(archive.exists(n) for n in ("fabric.mod.json", "quilt.mod.json")) or any(
+            n.endswith("mods.toml") for n in archive.names):
+        return "mod"
+    if itemsadder.detect_itemsadder(archive, log) is not None:
+        return "itemsadder"
+    if resourcepack.detect_resourcepack(archive, log) is not None:
+        return "resourcepack"
+    return "mod"
+
 
 
 class ConversionDriver:
@@ -38,8 +68,22 @@ class ConversionDriver:
         self.log.phase("INIT", "Начало конвертации", source=str(self.input_path), output=str(self.output_dir))
 
         with open_archive(self.input_path, self.log) as archive:
-            self.log.phase("ANALYZE", "Анализ исходного мода")
-            analysis = analyzer.analyze_archive(archive, self.log, self.minecraft_version, settings)
+            source_kind = detect_source_kind(archive, self.log, getattr(settings, "source_mode", "auto"))
+            self.log.phase("DETECT", "Определение формата исходника", source=source_kind)
+
+            if source_kind == "itemsadder":
+                self.log.phase("ANALYZE", "Анализ ItemsAdder-пака (contents/)")
+                ia_layout = itemsadder.detect_itemsadder(archive, self.log)
+                ia_analyzer = itemsadder.ItemsAdderAnalyzer(self.log, self.minecraft_version, settings)
+                analysis = ia_analyzer.analyze(archive, ia_layout)
+            elif source_kind == "resourcepack":
+                self.log.phase("ANALYZE", "Анализ ресурс-пака (models/ + textures/)")
+                rp_layout = resourcepack.detect_resourcepack(archive, self.log)
+                rp_analyzer = resourcepack.ResourcePackAnalyzer(self.log, self.minecraft_version, settings)
+                analysis = rp_analyzer.analyze(archive, rp_layout)
+            else:
+                self.log.phase("ANALYZE", "Анализ исходного мода")
+                analysis = analyzer.analyze_archive(archive, self.log, self.minecraft_version, settings)
 
             # Neural semantic pass: classify every detected object, apply the
             # safe conclusions to the IR and record what it decided.
@@ -60,10 +104,13 @@ class ConversionDriver:
                 raise RuntimeError("generator.generate_all() returned None")
 
             # Generate SliceBoard integration package outside configuration so CraftEngine does not parse its DSL as CE recipes.
-            for sb_file in generate_sliceboard(analysis, settings):
-                generation.files.append(sb_file)
-            for warning in getattr(analysis, "sliceboard_warnings", []):
-                generation.diagnostics.append({"id": warning.get("recipe"), "domain": "sliceboard", **warning})
+            # ItemsAdder packs never carry cutting-board recipes, so the
+            # SliceBoard pass is skipped for that source.
+            if source_kind == "mod":
+                for sb_file in generate_sliceboard(analysis, settings):
+                    generation.files.append(sb_file)
+                for warning in getattr(analysis, "sliceboard_warnings", []):
+                    generation.diagnostics.append({"id": warning.get("recipe"), "domain": "sliceboard", **warning})
 
             # Categories are generated LAST, after items, blocks, recipes,
             # loot, sounds and SliceBoard. Membership is derived from the
@@ -76,6 +123,7 @@ class ConversionDriver:
                 60 if f.domain == status.DOMAIN_LOOT else
                 50 if f.domain == status.DOMAIN_RECIPE else
                 40 if f.domain == "sound" else
+                25 if f.domain == status.DOMAIN_FURNITURE else
                 20 if f.domain == status.DOMAIN_BLOCK else 10 if f.domain == status.DOMAIN_ITEM else 99,
                 f.rel_path.lower(), f.object_id.lower()
             ))
@@ -113,6 +161,15 @@ class ConversionDriver:
             )
 
             self._write_semantics_reports(semantic_result)
+
+            if analysis.source_kind == "itemsadder":
+                (report_dir / "itemsadder.md").write_text(
+                    itemsadder.conversion_report(analysis), encoding="utf-8"
+                )
+            elif analysis.source_kind == "resourcepack":
+                (report_dir / "resourcepack.md").write_text(
+                    resourcepack.conversion_report(analysis), encoding="utf-8"
+                )
 
             source_hash = util.sha256_file(self.input_path) if self.input_path.is_file() else "directory"
             self.log.phase("DONE", "Конвертация завершена", generated=len(generation.files), validation=validation.valid, fidelity=not bool(fidelity_result["issues"]))
@@ -183,6 +240,22 @@ class ConversionDriver:
         """
         rp_dir = self.output_dir / "resourcepack"
 
+        # Assets the converter synthesized (e.g. armor equipment assets). These
+        # are written first so a verbatim source copy can never shadow them.
+        for name, text in sorted(getattr(analysis, "generated_assets", {}).items()):
+            self._write_copied_asset(rp_dir, name, text.encode("utf-8"))
+
+        # Sources that do not already store their resources under ``assets/``
+        # (ItemsAdder keeps them under ``contents/<ns>/``) publish an explicit
+        # archive-path -> resourcepack-path map. That map is authoritative.
+        if getattr(analysis, "resource_map", None):
+            for name, dest_rel in sorted(analysis.resource_map.items()):
+                data = archive.read(name)
+                if data is None:
+                    continue
+                self._write_copied_asset(rp_dir, dest_rel, data)
+            return
+
         if getattr(self.settings, "copy_all_assets", True):
             for name in archive.names:
                 if not name.startswith("assets/"):
@@ -231,11 +304,43 @@ def convert(
     minecraft_version: str = "1.21.4",
     verbose: bool = False,
     settings: Settings | None = None,
+    source: str = "auto",
 ) -> dict[str, Any]:
     log = Log(verbose, getattr(settings, "log_level", None) if settings is not None else None)
+    if settings is None:
+        settings = load_settings(log=log).settings
+    # An explicit --source always beats the saved setting.
+    if source and source != "auto":
+        settings.source_mode = source
     driver = ConversionDriver(input_path, output_dir, target, minecraft_version, log, settings)
     return driver.run()
 
+
+
+def describe_source(input_path: str | Path, settings: Settings | None = None, verbose: bool = False) -> dict[str, Any]:
+    """Summarize what kind of input this is, for the GUI preflight.
+
+    Returns the resolved source kind plus, for ItemsAdder packs, the namespace
+    and resource layout that will be used - so the user can confirm the
+    converter read their pack correctly before converting.
+    """
+    log = Log(verbose)
+    active = settings or load_settings(log=log).settings
+    with open_archive(Path(input_path), log) as archive:
+        kind = detect_source_kind(archive, log, active.source_mode)
+        info: dict[str, Any] = {"kind": kind, "path": str(input_path)}
+        if kind == "itemsadder":
+            layout = itemsadder.detect_itemsadder(archive, log)
+            info["itemsadder"] = layout.to_dict() if layout else None
+        elif kind == "resourcepack":
+            layout = resourcepack.detect_resourcepack(archive, log)
+            info["resourcepack"] = layout.to_dict() if layout else None
+        else:
+            from .detector import ModDetector
+
+            meta = ModDetector(log).detect(archive)
+            info["mod"] = meta.to_dict()
+        return info
 
 
 def suggest_namespace_mappings(
@@ -317,10 +422,20 @@ def scan(input_path: str | Path, verbose: bool = False) -> dict[str, Any]:
         return {"metadata": metadata.to_dict()}
 
 
-def analyze(input_path: str | Path, minecraft_version: str, verbose: bool = False) -> dict[str, Any]:
+def analyze(
+    input_path: str | Path,
+    minecraft_version: str,
+    verbose: bool = False,
+    source: str = "auto",
+) -> dict[str, Any]:
     log = Log(verbose)
+    settings = load_settings(log=log).settings
     with open_archive(input_path, log) as archive:
-        result = analyzer.analyze_archive(archive, log, minecraft_version)
+        kind = detect_source_kind(archive, log, source if source != "auto" else settings.source_mode)
+        if kind == "itemsadder":
+            result = itemsadder.ItemsAdderAnalyzer(log, minecraft_version, settings).analyze(archive)
+        else:
+            result = analyzer.analyze_archive(archive, log, minecraft_version)
         return result.to_dict()
 
 

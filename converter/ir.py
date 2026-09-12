@@ -56,6 +56,8 @@ class ItemNode(BaseNode):
     model: str | None = None
     textures: list[str] = field(default_factory=list)
     behavior: dict[str, Any] | None = None
+    # CraftEngine `events:` DSL entries (list of {on, functions, conditions}).
+    events: list[dict[str, Any]] = field(default_factory=list)
     recipe_references: list[str] = field(default_factory=list)
     tool_tier: str | None = None
     gear_kind: str | None = None
@@ -92,6 +94,7 @@ class ItemNode(BaseNode):
                 "model": self.model,
                 "textures": self.textures,
                 "behavior": self.behavior,
+                "events": self.events,
                 "recipe_references": self.recipe_references,
                 "tool_tier": self.tool_tier,
                 "gear_kind": self.gear_kind,
@@ -228,6 +231,40 @@ class RecipeNode(BaseNode):
                 "post_processors": self.post_processors,
                 "transform_processors": self.transform_processors,
                 "raw": self.raw,
+            }
+        )
+        return data
+
+
+@dataclass
+class FurnitureNode(BaseNode):
+    """Entity-based decoration (ItemsAdder furniture -> CraftEngine furniture).
+
+    ``variants`` mirrors the CraftEngine furniture section of the same name:
+    each variant holds ``elements`` (display entities) and ``hitboxes``
+    (collision boxes, optional seats).
+    """
+
+    item: str | None = None
+    display_name: str | None = None
+    variants: dict[str, Any] = field(default_factory=dict)
+    settings: dict[str, Any] = field(default_factory=dict)
+    loot_item: str | None = None
+    light_level: int | None = None
+    # Source-side provenance that has no CraftEngine key; kept for the reports.
+    unmapped: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        data = super().to_dict()
+        data.update(
+            {
+                "item": self.item,
+                "display_name": self.display_name,
+                "variants": self.variants,
+                "settings": self.settings,
+                "loot_item": self.loot_item,
+                "light_level": self.light_level,
+                "unmapped": self.unmapped,
             }
         )
         return data

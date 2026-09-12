@@ -172,6 +172,35 @@ class Settings:
         ]
     )
 
+    # --- source adapter selection ---
+    # "auto" inspects the input and picks the mod or ItemsAdder adapter;
+    # "mod" / "itemsadder" force one of them.
+    source_mode: str = "auto"
+
+    # --- ItemsAdder import ---
+    # ItemsAdder's resource.material is semantic (it selects the vanilla item
+    # the custom item is built on), so unlike mod conversion it is preserved.
+    ia_preserve_material: bool = True
+    # CraftEngine has no "immune to explosions" flag; this resistance value is
+    # used for ItemsAdder `no_explosion: true` blocks (bedrock-grade).
+    ia_explosion_immune_resistance: float = 3600000.0
+    # ItemsAdder assigns custom_model_data itself. CraftEngine assigns model
+    # ids too, so source values are recorded but not forced unless enabled.
+    ia_force_custom_model_data: bool = False
+    ia_generate_furniture: bool = True
+    # Locale used to resolve ItemsAdder translation keys into display text.
+    ia_default_locale: str = "en"
+    # Emit vanilla `consumable` sub-fields (consume_seconds, sound, animation)
+    # when the source pack defines them.
+    ia_emit_consumable_details: bool = True
+
+    # --- resource pack source (models/ + textures/ -> configs) -------------
+    # A resource pack carries no material, so every generated item needs one.
+    rp_default_material: str = "nether_brick"
+    # assets/minecraft/ overrides change vanilla items rather than adding
+    # content; by default they are reported, not minted into CraftEngine items.
+    rp_skip_vanilla_overrides: bool = True
+
     def station_for(self, recipe_type: str) -> str:
         if recipe_type in self.recipe_stations:
             return self.recipe_stations[recipe_type]
@@ -275,6 +304,15 @@ class Settings:
             "crop_seed_relation_from_bytecode": self.crop_seed_relation_from_bytecode,
             "crop_seed_name_suffixes": self.crop_seed_name_suffixes,
             "food_keywords": self.food_keywords,
+            "source_mode": self.source_mode,
+            "ia_preserve_material": self.ia_preserve_material,
+            "ia_explosion_immune_resistance": self.ia_explosion_immune_resistance,
+            "ia_force_custom_model_data": self.ia_force_custom_model_data,
+            "ia_generate_furniture": self.ia_generate_furniture,
+            "ia_default_locale": self.ia_default_locale,
+            "ia_emit_consumable_details": self.ia_emit_consumable_details,
+            "rp_default_material": self.rp_default_material,
+            "rp_skip_vanilla_overrides": self.rp_skip_vanilla_overrides,
         }
 
 
@@ -363,6 +401,17 @@ def _as_settings(data: Any) -> Settings:
         s.crop_seed_name_suffixes = [str(x) for x in data["crop_seed_name_suffixes"]]
     if isinstance(data.get("food_keywords"), list):
         s.food_keywords = [str(x) for x in data["food_keywords"]]
+    s.source_mode = str(data.get("source_mode", s.source_mode)).lower()
+    if s.source_mode not in ("auto", "mod", "itemsadder", "resourcepack"):
+        s.source_mode = "auto"
+    s.ia_preserve_material = bool(data.get("ia_preserve_material", s.ia_preserve_material))
+    s.ia_explosion_immune_resistance = float(data.get("ia_explosion_immune_resistance", s.ia_explosion_immune_resistance))
+    s.ia_force_custom_model_data = bool(data.get("ia_force_custom_model_data", s.ia_force_custom_model_data))
+    s.ia_generate_furniture = bool(data.get("ia_generate_furniture", s.ia_generate_furniture))
+    s.ia_default_locale = str(data.get("ia_default_locale", s.ia_default_locale))
+    s.ia_emit_consumable_details = bool(data.get("ia_emit_consumable_details", s.ia_emit_consumable_details))
+    s.rp_default_material = str(data.get("rp_default_material", s.rp_default_material))
+    s.rp_skip_vanilla_overrides = bool(data.get("rp_skip_vanilla_overrides", s.rp_skip_vanilla_overrides))
     return s
 
 

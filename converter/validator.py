@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import json
+
 import yaml
 
 from . import schema, util
@@ -90,6 +92,8 @@ class OutputValidator:
             is_sliceboard = allowed_roots == sliceboard_roots
             if not is_sliceboard:
                 self._validate_nested_keys(path, doc, report)
+                self._validate_required_keys(path, doc, report)
+                self._validate_types(path, doc, report)
             is_merged = path.name == "all.yml" or path.name == "all.yaml"
             for section, value in doc.items():
                 if isinstance(value, dict):
@@ -111,6 +115,154 @@ class OutputValidator:
                         )
 
         return report
+
+    # Python equivalents of the primitive types the schemas declare. Anything
+    # not listed here (``minecraft:composite``, ``attribute id e.g.
+    # attack_damage``, ...) is opaque at this layer and is deliberately not
+    # guessed at — a false "type error" is worse than no check.
+    _PY_TYPES: dict[str, tuple[type, ...]] = {
+        "string": (str,),
+        "str": (str,),
+        "int": (int,),
+        "integer": (int,),
+        "float": (int, float),
+        "boolean": (bool,),
+        "bool": (bool,),
+        "mapping": (dict,),
+        "map": (dict,),
+        "list": (list,),
+        "number": (int, float),
+    }
+
+    def _declared_types(self, filename: str, section: str) -> dict[str, str]:
+        """Load ``{path: declared_type}`` from a bundled schema file (cached)."""
+        cache = getattr(self, "_type_cache", None)
+        if cache is None:
+            cache = self._type_cache = {}
+        key = (filename, section)
+        if key in cache:
+            return cache[key]
+        out: dict[str, str] = {}
+        path = Path(__file__).resolve().parent.parent / "schemas" / "craftengine" / "26.8" / filename
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            cache[key] = out
+            return out
+        nodes = data.get(section)
+        if isinstance(nodes, list):
+            for node in nodes:
+                if isinstance(node, dict) and isinstance(node.get("path"), str) and isinstance(node.get("type"), str):
+                    out[node["path"]] = node["type"]
+        elif isinstance(nodes, dict):
+            for name, declared in nodes.items():
+                if isinstance(declared, str):
+                    out[name] = declared
+        cache[key] = out
+        return out
+
+    @classmethod
+    def _type_matches(cls, value: Any, declared: str) -> bool:
+        """True if ``value`` fits ``declared``; True for types we cannot judge."""
+        for part in (p.strip() for p in declared.split("|")):
+            allowed = cls._PY_TYPES.get(part.lower())
+            if allowed is None:
+                return True  # opaque type — do not guess
+            # bool is a subclass of int in Python, so reject it explicitly for
+            # numeric fields: CraftEngine would fail to coerce `true` to a count.
+            if isinstance(value, bool) and allowed != (bool,):
+                continue
+            if isinstance(value, allowed):
+                return True
+        return False
+
+    def _validate_types(self, path: Path, doc: dict[str, Any], report: ValidationResult) -> None:
+        """Check value types the way CraftEngine's config loader would.
+
+        An allowed-key check accepts ``max_stack_size: "64"`` — the key is
+        spelled correctly — but the plugin deserialises that field into an int
+        and fails on load. Types come from the bundled schemas, which carry a
+        ``type`` per path, so this tracks the target format rather than
+        hard-coding expectations.
+        """
+        items = doc.get("items")
+        if not isinstance(items, dict):
+            return
+        rel = str(path.relative_to(self.output_dir)).replace("\\", "/") if getattr(self, "output_dir", None) else str(path)
+        root_types = self._declared_types("items.json", "item_nodes")
+        data_types = self._declared_types("item_data.json", "data_keys")
+        for item_id, body in items.items():
+            if not isinstance(body, dict):
+                continue
+            for key, declared in root_types.items():
+                if key in body and not self._type_matches(body[key], declared):
+                    report.issues.append(
+                        ValidationIssue(
+                            "warn",
+                            rel,
+                            f"item {item_id}: '{key}' should be {declared}, "
+                            f"got {type(body[key]).__name__}",
+                        )
+                    )
+            data = body.get("data")
+            if not isinstance(data, dict):
+                continue
+            for key, declared in data_types.items():
+                if key in data and not self._type_matches(data[key], declared):
+                    report.issues.append(
+                        ValidationIssue(
+                            "warn",
+                            rel,
+                            f"item {item_id}: data '{key}' should be {declared}, "
+                            f"got {type(data[key]).__name__}",
+                        )
+                    )
+
+    def _validate_required_keys(self, path: Path, doc: dict[str, Any], report: ValidationResult) -> None:
+        """Flag objects that are missing a key CraftEngine itself requires.
+
+        The allowed-key check above only catches *extra* keys; a config that is
+        missing a mandatory one is equally unloadable, and CraftEngine rejects it
+        at load time rather than degrading gracefully. Only constraints that the
+        bundled schema marks as ``required`` are enforced here, so this stays in
+        step with the target format instead of hard-coding guesses.
+
+        ``furniture.variants`` is the one field the furniture schema marks
+        required — a furniture object without it has nothing to render and no
+        hitbox, so it is an error rather than a warning. ``blocks`` are checked
+        at warning level because a block legitimately carries either ``state``
+        or ``states``, and which one applies is decided by the generator.
+        """
+        rel = str(path.relative_to(self.output_dir)).replace("\\", "/") if getattr(self, "output_dir", None) else str(path)
+        furniture = doc.get("furniture")
+        if isinstance(furniture, dict):
+            for furniture_id, body in furniture.items():
+                if not isinstance(body, dict):
+                    continue
+                variants = body.get("variants")
+                if not isinstance(variants, dict) or not variants:
+                    report.valid = False
+                    report.issues.append(
+                        ValidationIssue(
+                            "error",
+                            rel,
+                            f"furniture {furniture_id}: missing required 'variants' "
+                            f"(CraftEngine needs at least one variant to render)",
+                        )
+                    )
+        blocks = doc.get("blocks")
+        if isinstance(blocks, dict):
+            for block_id, body in blocks.items():
+                if not isinstance(body, dict):
+                    continue
+                if "state" not in body and "states" not in body:
+                    report.issues.append(
+                        ValidationIssue(
+                            "warn",
+                            rel,
+                            f"block {block_id}: has neither 'state' nor 'states'",
+                        )
+                    )
 
     def _validate_nested_keys(self, path: Path, doc: dict[str, Any], report: ValidationResult) -> None:
         """Validate CraftEngine nested keys against the bundled target schema.

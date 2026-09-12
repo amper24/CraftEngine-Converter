@@ -29,12 +29,24 @@ def build_parser() -> argparse.ArgumentParser:
     analyze_p = sub.add_parser("analyze", help="build IR for a mod")
     analyze_p.add_argument("mod", help="path to mod JAR or directory")
     analyze_p.add_argument("--minecraft", default="1.21.4", help="target Minecraft version")
+    analyze_p.add_argument(
+        "--source",
+        default="auto",
+        choices=("auto", "mod", "itemsadder", "resourcepack"),
+        help="input format: a mod jar/dir, or an ItemsAdder contents/ pack",
+    )
 
     convert_p = sub.add_parser("convert", help="convert a mod to CraftEngine")
     convert_p.add_argument("mod", help="path to mod JAR or directory")
     convert_p.add_argument("--target", default="craftengine:26.8")
     convert_p.add_argument("--minecraft", default="1.21.4")
     convert_p.add_argument("--output", required=True, help="output directory")
+    convert_p.add_argument(
+        "--source",
+        default="auto",
+        choices=("auto", "mod", "itemsadder", "resourcepack"),
+        help="input format: a mod jar/dir, or an ItemsAdder contents/ pack",
+    )
 
     validate_p = sub.add_parser("validate", help="validate a generated output")
     validate_p.add_argument("output", help="output directory")
@@ -58,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "scan":
             _print_json(driver.scan(args.mod, verbose=args.verbose))
         elif args.command == "analyze":
-            _print_json(driver.analyze(args.mod, args.minecraft, verbose=args.verbose))
+            _print_json(driver.analyze(args.mod, args.minecraft, verbose=args.verbose, source=args.source))
         elif args.command == "convert":
             result = driver.convert(
                 args.mod,
@@ -66,6 +78,7 @@ def main(argv: list[str] | None = None) -> int:
                 target=args.target,
                 minecraft_version=args.minecraft,
                 verbose=args.verbose,
+                source=args.source,
             )
             _print_json(result)
         elif args.command == "validate":

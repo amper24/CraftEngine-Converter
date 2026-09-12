@@ -83,7 +83,7 @@ class Packager:
             "items": len(self.analysis.items),
             "blocks": len(self.analysis.blocks),
             "recipes": len(self.analysis.recipes),
-            "furniture": 0,
+            "furniture": len(getattr(self.analysis, "furniture", {}) or {}),
             "loot": len(self.analysis.loot),
             "resources": len(self.analysis.resources),
         }
@@ -294,7 +294,7 @@ class Packager:
             "items": len(self.analysis.items),
             "blocks": len(self.analysis.blocks),
             "recipes": len(self.analysis.recipes),
-            "furniture": 0,
+            "furniture": len(getattr(self.analysis, "furniture", {}) or {}),
             "loot": len(self.analysis.loot),
             "resources": len(self.analysis.resources),
         }
@@ -697,7 +697,7 @@ class Packager:
                 "items": len(self.analysis.items),
                 "blocks": len(self.analysis.blocks),
                 "recipes": len(self.analysis.recipes),
-                "furniture": 0,
+                "furniture": len(getattr(self.analysis, "furniture", {}) or {}),
                 "loot": len(self.analysis.loot),
                 "resources": len(self.analysis.resources),
             },

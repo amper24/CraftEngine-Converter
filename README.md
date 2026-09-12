@@ -25,6 +25,247 @@
   команды для проверки каждого объекта.
 - Отчёты (summary / semantics / commands / unsupported / partial / manual-tasks /
   warnings / validation), manifest, source-map и README результата.
+- **Режим ItemsAdder → CraftEngine**: читает пак `contents/` плагина ItemsAdder
+  (предметы, блоки, мебель, категории, lang, текстуры и модели) и строит из него
+  пакет CraftEngine тем же конвейером.
+
+## Режим ItemsAdder → CraftEngine
+
+Конвертер принимает не только мод-JAR, но и **пак контента ItemsAdder** — папку
+`plugins/ItemsAdder/contents/` (или саму `contents/`, или папку одного
+namespace). Формат определяется автоматически; принудительно — флагом
+`--source itemsadder` или `source_mode: itemsadder` в `settings.yml`.
+
+ItemsAdder описывает контент декларативно в YAML, поэтому вместо чтения
+байткода конвертер разбирает эти файлы и строит **тот же самый IR**. Дальше
+работает обычный конвейер: семантика → capability → генератор → пакет →
+валидатор. Никакого отдельного «второго конвертера» нет.
+
+```bash
+# автоопределение
+python -m converter convert plugins/ItemsAdder/contents --output converted/mypack
+
+# то же самое явно
+python -m converter convert plugins/ItemsAdder/contents \
+  --source itemsadder --output converted/mypack
+```
+
+### Что переносится
+
+| ItemsAdder | CraftEngine |
+| --- | --- |
+| `display_name` / `name` (включая ключи `display-name-*` из `lang:`) | `data.item_name` |
+| `lore` | `data.lore` |
+| `resource.material` | `material` (сохраняется: в IA это предмет-основа) |
+| `resource.generate: true` + `textures` | `texture` / `textures` (или `minecraft:item/handheld` для инструментов) |
+| `resource.generate: false` + `model_path` | `model: {type: minecraft:model, path: …}` |
+| `attribute_modifiers` (camelCase, `SCREAMING_SNAKE`, snake_case и списковая форма) | `data.attribute_modifiers` |
+| `durability.max_durability` / `unbreakable` / `disappear_when_broken` | `data.max_damage` / `data.unbreakable` / `settings.prevent_break` |
+| `enchants`, `item_flags`, `max_stack_size`, `glint`, `fuel` | `data.enchantments`, `data.hide_tooltip`, `data.components`, `settings.fuel_time` |
+| `consumable` и старый `events.eat/drink.feed` | `data.food` + `data.consumable` |
+| `specific_properties.armor` + `armors_rendering` | `data.equippable` (`slot`, `asset_id`) |
+| `behaviours.block` (`placed_model.type`, `hardness`, `light_level`, звуки, инструменты) | блок + `behavior: block_item`, `state.auto_state`, `settings.*` |
+| `behaviours.furniture` (hitbox, `display_transformation`, `placeable_on`, свет) | мебель + `behavior: furniture_item`, `variants`, `glowing_furniture` |
+| `drop.break_block.loots` (шанс 0–100) | loot-таблица (вероятность 0–1) |
+| `categories` (включая `ns:*` и regex) | `categories` |
+| `lang` | `assets/<ns>/lang/<locale>.json` |
+| `textures/`, `models/`, `resources/resourcepack/assets/` | `resourcepack/assets/<ns>/…` |
+| `data/<ns>/recipes/*.json` внутри пака | рецепты (тот же парсер, что и для модов) |
+| `template` / `variant_of` | разворачивается наследование, сам шаблон не генерируется |
+
+Соответствия вынесены в data-driven таблицы `mappings/itemsadder/`
+(`attributes.json`, `block_types.json`, `item_flags.json`, `behaviours.json`) —
+их можно править без изменения кода.
+
+### Отчёт о полном переносе
+
+Каждый ключ исходника попадает в `reports/itemsadder.md`: что во что
+превратилось и что требует ручной работы. Ключ без эквивалента не исчезает
+молча — он получает статус `partial` или `unsupported` с пояснением.
+
+```text
+## Summary
+| Support | Keys |
+| direct | 51 |
+| transform | 13 |
+| partial | 1 |
+| unsupported | 5 |
+```
+
+### Настройки
+
+```yaml
+source_mode: auto                    # auto | mod | itemsadder
+ia_preserve_material: true           # сохранять resource.material
+ia_explosion_immune_resistance: 3600000.0   # для блоков с no_explosion: true
+ia_force_custom_model_data: false    # не навязывать model_id из IA
+ia_generate_furniture: true
+ia_default_locale: en                # откуда брать переводы display-name-*
+ia_emit_consumable_details: true
+```
+
+В GUI формат выбирается в выпадающем списке «Источник». Для пака ItemsAdder
+диалог маппинга namespace (он нужен только SliceBoard) пропускается, а в лог
+выводится распознанная раскладка: namespace'ы, число конфигов и где лежат
+ресурсы.
+
+### Вход: папка или архив
+
+Конвертер принимает любую из трёх форм, и результат одинаков:
+
+- папку `plugins/ItemsAdder/contents/` (или саму `contents/`);
+- ZIP-архив этой папки;
+- ZIP-архив с папкой-обёрткой (`MyAwesomePack/contents/...`) — корень находится сам.
+
+Расширение не важно: архив открывается через `zipfile`, поэтому `.zip` и `.jar`
+идут по одному пути. В GUI фильтр файла предлагает и то, и другое.
+
+### События и действия
+
+`events:` из ItemsAdder переводится в events-DSL CraftEngine
+(`mappings/itemsadder/events.json`). На каждое событие ItemsAdder создаётся
+отдельная запись `on/functions/conditions`, чтобы шанс одного события не
+перетекал на соседнее с тем же триггером.
+
+| ItemsAdder | CraftEngine |
+| --- | --- |
+| `attack` | `attack` |
+| `block_break` / `item_break` | `block_break` / `item_break` |
+| `interact`, `interact_mainhand`, `interact_offhand` | `right_click` |
+| `eat`, `drink` | `consume` |
+| `pickup` | `pick_up` |
+| `chance: 0.35` | условие `random` |
+
+Действия: `message`, `actionbar`, `title`, `execute_commands`, `play_sound`,
+`play_particle`, `potion_effect`, `remove_potion_effect`, `feed`,
+`increment/decrement_amount`, `set_block`, `drop_item`, `place/remove/replace_furniture`,
+`mythic_mobs_skill`, `cancel`, `swing_hand`, `teleport`, `toast`. Повторы вида
+`play_sound_2` разворачиваются, имена эффектов приводятся к ванильным
+(`SPEED` → `minecraft:speed`).
+
+Триггеры без аналога (`wear`, `unwear`, `held`, `drop`, `kill`, `bow_shot`,
+`fishing_*`, `gun_*`, `book_*`, `bucket_*`) и действия без аналога
+(`veinminer`, `script`, `explosion`, `damage_entity`, `feed`-соседи и т.д.)
+**не выбрасываются молча**: каждая такая строка попадает в
+`reports/itemsadder.md` с пояснением, что делать. Недопустимые значения тоже не
+генерируются — например, `open_inventory: my_custom_menu` не станет
+`open_window` с чужеродным `gui_type`, а уйдёт в отчёт.
+
+Встроенный `cooldown` не переносится: в CraftEngine кулдауны именные
+(`set_cooldown` + условие `on_cooldown`), это тоже фиксируется в отчёте.
+
+### Рендер брони
+
+`armors_rendering` больше не оставляет висячую ссылку. Для каждого id
+генерируется `assets/<ns>/equipment/<id>.json`, а текстуры `layer_1`/`layer_2`
+переезжают в ванильные каталоги `textures/entity/equipment/humanoid/` и
+`.../humanoid_leggings/` — иначе `data.equippable.asset_id` ссылается в никуда и
+броня не отрисовывается. Если PNG слоёв в паке нет, ассет не выдумывается: в
+`reports/itemsadder.md` появляется строка `partial` с указанием, чего не хватает.
+
+### Реестр звуков и корневые ключи
+
+Корневой `sounds:` превращается в `assets/<ns>/sounds.json` — без него `.ogg`
+файлы просто лежат в паке и ни один id звука не разрешается. `path` становится
+подкаталогом, `settings.subtitle` переносится как есть.
+
+Корневые ключи, у которых в CraftEngine нет аналога (`entities`, `liquids`,
+`hud`, `emotes`, `biomes`, `world_populators`, `paintings`, `books`,
+`music_discs`, `trims`, `fonts`), больше не исчезают бесследно: каждый даёт
+строку в `reports/itemsadder.md` с указанием файла-источника и пояснением, куда
+это содержание девать.
+
+### Книги и луки
+
+`behaviours.book` переносится в `data.written_book_content`: статические
+страницы, `title` и `author`. Страницы с плейсхолдерами или интерактивным
+содержимым статическим текстом не становятся — они пропускаются, и отчёт
+точно называет их количество (вывод и отчёт не расходятся).
+
+`bow`/`crossbow`/`quiver` помечены как `unsupported`, а не `partial`: в
+CraftEngine 26.8 нет ключа-списка снарядов, поэтому скорость натяжения и урон
+стрелы берутся из ванильного материала. Раньше таблица маппинга обещала
+`allowed_projectiles` — ключ, которого схема не знает и который не генерировался.
+
+### Сиденья (мебель)
+
+`behaviours.furniture_sit` превращается в `seats` у хитбокса CraftEngine —
+именно так устроены паки сидений вроде «Cushions»:
+
+```yaml
+variants:
+  ground:
+    hitboxes:
+      - type: interaction
+        seats: ["0,0.5,0"]   # x,y,z, опционально yaw через пробел
+```
+
+`sit_height` становится координатой Y. У IA-ключа `sit_all_solid_blocks`
+(сидеть на любом твёрдом блоке) аналога нет — в CraftEngine сиденье принадлежит
+конкретной мебели, это фиксируется в отчёте.
+
+### Строковый NBT
+
+`nbt:` в строковой форме (`'{my-tag:"hello"}'`) разбирается собственным
+парсером SNBT и раскладывается в `data.components`. То, что парсер не понимает
+полностью, отдаётся человеку через отчёт — догадок не подставляется.
+
+## Режим «ресурс-пак → CraftEngine»
+
+Конвертер умеет брать **обычный ресурспак** и генерировать конфиги из того, что
+в нём уже нарисовано: `assets/<ns>/models/item/*.json` и
+`assets/<ns>/textures/item/*.png`. Художнику не нужно писать по YAML на каждую
+текстуру.
+
+```bash
+python -m converter convert path/to/resourcepack --output out --source resourcepack
+```
+
+`--source auto` (значение по умолчанию) выбирает формат по убыванию
+специфичности: мод-JAR (есть метаданные загрузчика) → ItemsAdder (`contents/`) →
+ресурспак (`assets/`). Это важно, потому что и мод, и пак ItemsAdder тоже
+содержат `assets/`.
+
+### Что во что превращается
+
+| В ресурспаке | В CraftEngine |
+| --- | --- |
+| только текстура | `texture: <ns>:item/<name>` — модель генерирует CraftEngine |
+| есть `models/item/<name>.json` | `model: <ns>:item/<name>`, **без** блока `generation` |
+| текстура с «инструментальным» именем (`_sword`, `_pickaxe`, …) | `generation.parent: minecraft:item/handheld` |
+| `lang/en_us.json` → `item.<ns>.<name>` | `data.item_name` |
+
+Правило про `generation` принципиальное: блок `generation` рядом с настоящим
+`.json` модели переопределяет авторскую модель, поэтому он добавляется только
+там, где модели в паке нет.
+
+### Что не конвертируется и почему
+
+- `assets/<ns>/models/block/*.json` — для блока нужен конфиг CraftEngine со
+  states, из одной модели он не выводится;
+- `assets/minecraft/` — это переопределение ванильных предметов, а не новый
+  контент.
+
+Оба случая попадают в `reports/resourcepack.md`, а не исчезают.
+
+### Настройки
+
+| Ключ | По умолчанию | Смысл |
+| --- | --- | --- |
+| `rp_default_material` | `nether_brick` | Материал для всех предметов: в ресурспаке его нет, а CraftEngine иначе молча подставит свой |
+| `rp_skip_vanilla_overrides` | `true` | Не создавать предметы из `assets/minecraft/` |
+
+## Тесты
+
+```bash
+.venv/bin/python -m pytest tests -q
+```
+
+Часть тестов байткода требует внешний мод
+`mod-for-tests/VeggiesDelight-1.21.1-1.9.3.jar` (в репозитории его нет — он
+слишком большой). Без него они **пропускаются** с явной причиной, а не падают:
+падение должно означать поломку, а не отсутствие необязательного файла. Чтобы
+запустить их, положите jar в `mod-for-tests/`.
 
 ## Структура
 
@@ -35,6 +276,7 @@ converter/
   detector.py   ModDetector (loader/namespace/metadata)
   archive.py    чтение JAR/директории
   analyzer.py   IR: items/blocks/states/recipes/loot/tags/lang
+  itemsadder.py импорт пака ItemsAdder (contents/) в тот же IR
   ir.py         IR-модели
   capability.py capability/mapping engine
   generator.py  генерация CraftEngine YAML
@@ -51,6 +293,7 @@ converter/
 models/brain/               веса микро-нейросети (.npz, ~2 МБ на голову)
 schemas/craftengine/26.8/   машиночитаемые target-схемы
 mappings/                   data-driven mapping-правила
+mappings/itemsadder/        таблицы соответствия ItemsAdder -> CraftEngine
 tests/                      фикстура и проверки
 ```
 

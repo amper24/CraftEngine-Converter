@@ -2,17 +2,39 @@
   "domain": "events",
   "version": "26.8",
   "description": "Event entries DSL. Canonical form: list of {on, functions, conditions}.",
-  "source": "https://xiao-momi.github.io/craft-engine-wiki/reference/events/",
+  "source": "https://ce-pre.gtemc.cn/reference/events",
   "structure": {
     "form": "list",
-    "entry": { "on": "string|list", "functions": "list", "conditions": "list (optional)" }
+    "entry": {
+      "on": "string|list",
+      "functions": "list",
+      "conditions": "list (optional)"
+    }
   },
   "triggers": {
-    "items": ["break", "right_click", "left_click", "consume", "pick_up", "attack"],
-    "blocks": ["break", "place", "right_click", "left_click", "step"],
-    "furniture": ["break", "place", "right_click"]
+    "items": [
+      "item_break",
+      "block_break",
+      "right_click",
+      "left_click",
+      "consume",
+      "pick_up",
+      "attack"
+    ],
+    "blocks": [
+      "block_break",
+      "place",
+      "right_click",
+      "left_click",
+      "step"
+    ],
+    "furniture": [
+      "furniture_break",
+      "place",
+      "right_click"
+    ]
   },
-  "note": "Event must live in the config domain of the object that actually receives interaction.",
+  "note": "Event must live in the config domain of the object that actually receives interaction. Trigger names verified against ce-pre.gtemc.cn/reference/events, which uses domain-specific break triggers (item_break / block_break / furniture_break).",
   "example": {
     "events": [
       {
@@ -21,7 +43,12 @@
           {
             "type": "command",
             "command": "say hello",
-            "conditions": [{ "type": "permission", "permission": "craftengine.admin" }]
+            "conditions": [
+              {
+                "type": "permission",
+                "permission": "craftengine.admin"
+              }
+            ]
           }
         ]
       }

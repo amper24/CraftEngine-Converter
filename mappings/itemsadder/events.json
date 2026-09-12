@@ -1,0 +1,548 @@
+{
+  "domain": "itemsadder_events",
+  "description": "ItemsAdder item events/actions -> CraftEngine events DSL. Function bodies follow ce-pre.gtemc.cn/reference/functions; trigger names follow ce-pre.gtemc.cn/reference/events.",
+  "source": "https://wiki.itemsadder.com/adding-content/items/item-properties/events",
+  "event_triggers": {
+    "_comment": "IA event name -> CE `on` value. support: direct = same semantics, transform = renamed/narrowed, unsupported = no CE trigger at all.",
+    "attack": {
+      "on": "attack",
+      "support": "direct"
+    },
+    "left_click_entity": {
+      "on": "attack",
+      "support": "transform",
+      "note": "ItemsAdder fires on hitting an entity; CraftEngine `attack` is the same moment."
+    },
+    "left_click": {
+      "on": "left_click",
+      "support": "direct"
+    },
+    "block_break": {
+      "on": "block_break",
+      "support": "direct"
+    },
+    "item_break": {
+      "on": "item_break",
+      "support": "direct"
+    },
+    "interact": {
+      "on": "right_click",
+      "support": "direct"
+    },
+    "interact_mainhand": {
+      "on": "right_click",
+      "support": "transform",
+      "note": "CraftEngine has no per-hand trigger; add a `hand` condition to keep the distinction."
+    },
+    "interact_offhand": {
+      "on": "right_click",
+      "support": "transform",
+      "note": "CraftEngine has no per-hand trigger; add a `hand` condition to keep the distinction."
+    },
+    "eat": {
+      "on": "consume",
+      "support": "direct"
+    },
+    "drink": {
+      "on": "consume",
+      "support": "direct"
+    },
+    "pickup": {
+      "on": "pick_up",
+      "support": "direct"
+    },
+    "wear": {
+      "support": "unsupported",
+      "note": "No CraftEngine trigger for equipping."
+    },
+    "unwear": {
+      "support": "unsupported",
+      "note": "No CraftEngine trigger for unequipping."
+    },
+    "held": {
+      "support": "unsupported",
+      "note": "No CraftEngine trigger for selecting the item in hand."
+    },
+    "held_offhand": {
+      "support": "unsupported",
+      "note": "No CraftEngine trigger for offhand selection."
+    },
+    "unheld": {
+      "support": "unsupported",
+      "note": "No CraftEngine trigger for deselecting the item."
+    },
+    "unheld_offhand": {
+      "support": "unsupported",
+      "note": "No CraftEngine trigger for offhand deselection."
+    },
+    "drop": {
+      "support": "unsupported",
+      "note": "No CraftEngine trigger for dropping the item."
+    },
+    "item_throw": {
+      "support": "unsupported",
+      "note": "No CraftEngine trigger for throwing the item."
+    },
+    "item_hit_ground": {
+      "support": "unsupported",
+      "note": "No CraftEngine trigger for a dropped item landing."
+    },
+    "item_hit_entity": {
+      "support": "unsupported",
+      "note": "No CraftEngine trigger for a thrown item hitting an entity."
+    },
+    "kill": {
+      "support": "unsupported",
+      "note": "No CraftEngine trigger for kills; use a CE `attack` event with your own check."
+    },
+    "book_read": {
+      "support": "unsupported",
+      "note": "No CraftEngine book trigger."
+    },
+    "book_write": {
+      "support": "unsupported",
+      "note": "No CraftEngine book trigger."
+    },
+    "bow_shot": {
+      "support": "unsupported",
+      "note": "No CraftEngine bow trigger."
+    },
+    "bucket_empty": {
+      "support": "unsupported",
+      "note": "No CraftEngine bucket trigger."
+    },
+    "bucket_fill": {
+      "support": "unsupported",
+      "note": "No CraftEngine bucket trigger."
+    },
+    "fishing_start": {
+      "support": "unsupported",
+      "note": "No CraftEngine fishing trigger."
+    },
+    "fishing_bite": {
+      "support": "unsupported",
+      "note": "No CraftEngine fishing trigger."
+    },
+    "fishing_caught": {
+      "support": "unsupported",
+      "note": "No CraftEngine fishing trigger."
+    },
+    "fishing_cancel": {
+      "support": "unsupported",
+      "note": "No CraftEngine fishing trigger."
+    },
+    "fishing_failed": {
+      "support": "unsupported",
+      "note": "No CraftEngine fishing trigger."
+    },
+    "fishing_in_ground": {
+      "support": "unsupported",
+      "note": "No CraftEngine fishing trigger."
+    },
+    "gun_no_ammo": {
+      "support": "unsupported",
+      "note": "ItemsAdder gun behaviour has no CraftEngine equivalent."
+    },
+    "gun_reload": {
+      "support": "unsupported",
+      "note": "ItemsAdder gun behaviour has no CraftEngine equivalent."
+    },
+    "gun_shot": {
+      "support": "unsupported",
+      "note": "ItemsAdder gun behaviour has no CraftEngine equivalent."
+    }
+  },
+  "actions": {
+    "_comment": "IA action name -> CE function. `fields` maps IA property -> CE property. `support: direct` keeps semantics; `transform` narrows or reshapes; `unsupported` is reported and never silently dropped.",
+    "cancel": {
+      "type": "cancel_event",
+      "support": "direct",
+      "fields": {}
+    },
+    "message": {
+      "type": "message",
+      "support": "direct",
+      "fields": {
+        "text": "message",
+        "target": "target"
+      }
+    },
+    "actionbar": {
+      "type": "actionbar",
+      "support": "direct",
+      "fields": {
+        "text": "actionbar",
+        "target": "target"
+      }
+    },
+    "title": {
+      "type": "title",
+      "support": "direct",
+      "fields": {
+        "title": "title",
+        "subtitle": "subtitle",
+        "fade_in": "fade_in",
+        "stay": "stay",
+        "fade_out": "fade_out"
+      }
+    },
+    "execute_command": {
+      "type": "command",
+      "support": "direct",
+      "fields": {
+        "command": "command",
+        "target": "target"
+      }
+    },
+    "execute_commands": {
+      "type": "command",
+      "support": "direct",
+      "fields": {
+        "command": "command",
+        "target": "target"
+      }
+    },
+    "play_sound": {
+      "type": "play_sound",
+      "support": "direct",
+      "fields": {
+        "name": "sound",
+        "sound": "sound",
+        "volume": "volume",
+        "pitch": "pitch"
+      }
+    },
+    "play_particle": {
+      "type": "particle",
+      "support": "transform",
+      "note": "ItemsAdder particle offsets are a single list; CraftEngine wants offset_x/offset_y/offset_z.",
+      "fields": {
+        "type": "particle",
+        "amount": "count",
+        "count": "count",
+        "speed": "speed"
+      }
+    },
+    "particles": {
+      "type": "particle",
+      "support": "transform",
+      "note": "ItemsAdder particle offsets are a single list; CraftEngine wants offset_x/offset_y/offset_z.",
+      "fields": {
+        "type": "particle",
+        "amount": "count",
+        "count": "count",
+        "speed": "speed"
+      }
+    },
+    "potion_effect": {
+      "type": "potion_effect",
+      "support": "direct",
+      "fields": {
+        "type": "potion_effect",
+        "duration": "duration",
+        "amplifier": "amplifier"
+      }
+    },
+    "remove_potion_effect": {
+      "type": "remove_potion_effect",
+      "support": "direct",
+      "fields": {
+        "type": "potion_effect"
+      }
+    },
+    "feed": {
+      "type": "set_food",
+      "support": "transform",
+      "note": "Split across `set_food` (amount) and `set_saturation` (saturation); both are emitted.",
+      "fields": {
+        "amount": "food",
+        "saturation": "saturation"
+      }
+    },
+    "swing_hand": {
+      "type": "swing_hand",
+      "support": "direct",
+      "fields": {}
+    },
+    "toast": {
+      "type": "toast",
+      "support": "transform",
+      "note": "CraftEngine `toast` also requires `icon`; a placeholder is emitted for you to fill in.",
+      "fields": {
+        "text": "toast"
+      }
+    },
+    "teleport": {
+      "type": "teleport",
+      "support": "transform",
+      "note": "CraftEngine `teleport` needs explicit x/y/z; ItemsAdder's target-relative form has no direct equivalent.",
+      "fields": {}
+    },
+    "mythic_mobs_skill": {
+      "type": "cast_mythic_skill",
+      "support": "direct",
+      "fields": {
+        "skill": "skill"
+      }
+    },
+    "place_furniture": {
+      "type": "spawn_furniture",
+      "support": "direct",
+      "fields": {
+        "furniture": "furniture_id"
+      }
+    },
+    "remove_furniture": {
+      "type": "remove_furniture",
+      "support": "direct",
+      "fields": {}
+    },
+    "replace_furniture": {
+      "type": "replace_furniture",
+      "support": "direct",
+      "fields": {
+        "furniture": "furniture_id"
+      }
+    },
+    "set_block": {
+      "type": "place_block",
+      "support": "direct",
+      "fields": {
+        "block": "block_state"
+      }
+    },
+    "replace_block": {
+      "type": "place_block",
+      "support": "transform",
+      "note": "CraftEngine `place_block` does not carry ItemsAdder's replace filter; review the target selection.",
+      "fields": {
+        "block": "block_state"
+      }
+    },
+    "multiple_break": {
+      "type": "break_block",
+      "support": "transform",
+      "note": "CraftEngine `break_block` acts on one position; the vein shape is not carried over.",
+      "fields": {}
+    },
+    "increment_amount": {
+      "type": "set_count",
+      "support": "direct",
+      "fields": {
+        "amount": "count"
+      }
+    },
+    "decrement_amount": {
+      "type": "set_count",
+      "support": "direct",
+      "fields": {
+        "amount": "count"
+      }
+    },
+    "open_inventory": {
+      "type": "open_window",
+      "support": "transform",
+      "note": "Only the vanilla gui types map: anvil, enchantment, grindstone, loom, smithing, crafting, cartography. Custom menus need a `command` instead.",
+      "fields": {
+        "inventory": "gui_type",
+        "gui_type": "gui_type",
+        "title": "title"
+      }
+    },
+    "open_trade_machine": {
+      "type": "merchant_trade",
+      "support": "transform",
+      "note": "CraftEngine `merchant_trade` wants the offers inline; ItemsAdder's trade-machine id does not resolve automatically.",
+      "fields": {}
+    },
+    "drop_item": {
+      "type": "drop_loot",
+      "support": "transform",
+      "note": "Emitted as a single-entry loot pool; review the drop position.",
+      "fields": {}
+    },
+    "drop_exp": {
+      "support": "unsupported",
+      "note": "No CraftEngine function grants raw experience."
+    },
+    "increment_durability": {
+      "support": "unsupported",
+      "note": "No CraftEngine function changes item durability; `damage` hurts the entity, not the item."
+    },
+    "decrement_durability": {
+      "support": "unsupported",
+      "note": "No CraftEngine function changes item durability; `damage` hurts the entity, not the item."
+    },
+    "decrement_usages": {
+      "support": "unsupported",
+      "note": "CraftEngine has no ItemsAdder-style usages counter."
+    },
+    "increment_player_stat": {
+      "support": "unsupported",
+      "note": "CraftEngine has no player-stat counters."
+    },
+    "decrement_player_stat": {
+      "support": "unsupported",
+      "note": "CraftEngine has no player-stat counters."
+    },
+    "give_item": {
+      "support": "unsupported",
+      "note": "Use a `command` with give instead."
+    },
+    "clear_item": {
+      "support": "unsupported",
+      "note": "No CraftEngine equivalent; `set_count` with 0 is the closest manual workaround."
+    },
+    "replace_item": {
+      "support": "unsupported",
+      "note": "No CraftEngine equivalent."
+    },
+    "stop_sound": {
+      "support": "unsupported",
+      "note": "No CraftEngine function stops sounds."
+    },
+    "play_effect": {
+      "support": "unsupported",
+      "note": "Sound effects only: use `play_sound` instead."
+    },
+    "play_animation": {
+      "support": "unsupported",
+      "note": "CraftEngine has no player-animation function."
+    },
+    "play_emote": {
+      "support": "unsupported",
+      "note": "CraftEngine has no emote function."
+    },
+    "ignite": {
+      "support": "unsupported",
+      "note": "No CraftEngine function sets entities on fire."
+    },
+    "explosion": {
+      "support": "unsupported",
+      "note": "No CraftEngine function creates explosions."
+    },
+    "damage_entity": {
+      "support": "unsupported",
+      "note": "CraftEngine `damage` cannot select an arbitrary ItemsAdder target."
+    },
+    "damage_near_entities": {
+      "support": "unsupported",
+      "note": "CraftEngine `damage` has no area selector."
+    },
+    "damage_entity_in_sight": {
+      "support": "unsupported",
+      "note": "CraftEngine `damage` has no raytrace selector."
+    },
+    "target_potion_effect": {
+      "support": "unsupported",
+      "note": "CraftEngine `potion_effect` applies to the event subject only."
+    },
+    "target_remove_potion_effect": {
+      "support": "unsupported",
+      "note": "CraftEngine `remove_potion_effect` applies to the event subject only."
+    },
+    "shoot_particle": {
+      "support": "unsupported",
+      "note": "No CraftEngine projectile-particle function."
+    },
+    "shoot_fireball": {
+      "support": "unsupported",
+      "note": "No CraftEngine projectile function."
+    },
+    "replace_near_blocks": {
+      "support": "unsupported",
+      "note": "No CraftEngine area block-replace function."
+    },
+    "glow_near_blocks": {
+      "support": "unsupported",
+      "note": "No CraftEngine block-glow function."
+    },
+    "replace_properties": {
+      "support": "unsupported",
+      "note": "Use CraftEngine `update_block_property` manually."
+    },
+    "replace_biome": {
+      "support": "unsupported",
+      "note": "No CraftEngine biome function."
+    },
+    "veinminer": {
+      "support": "unsupported",
+      "note": "Covered in CraftEngine by the `range_mining_item` behaviour instead."
+    },
+    "script": {
+      "support": "unsupported",
+      "note": "ItemsAdder script actions do not port; re-express them as CraftEngine functions."
+    }
+  },
+  "action_suffix": "_\\d+$",
+  "gate_properties": {
+    "chance": {
+      "condition": "random",
+      "value_field": "value",
+      "note": "IA chance 0..1 -> CE `random` condition."
+    },
+    "cooldown": {
+      "support": "unsupported",
+      "note": "CraftEngine cooldowns are id-based (`set_cooldown` + `on_cooldown`), so an IA inline cooldown cannot be carried over automatically."
+    }
+  },
+  "targets": {
+    "_comment": "ItemsAdder `target:` values -> CraftEngine `target:` values.",
+    "player": "self",
+    "all": "all",
+    "target": null
+  },
+  "open_window_gui_types": [
+    "anvil",
+    "enchantment",
+    "grindstone",
+    "loom",
+    "smithing",
+    "crafting",
+    "cartography"
+  ],
+  "potion_effects": {
+    "_comment": "Bukkit PotionType -> vanilla effect id. Only names that differ from a lowercased Bukkit id are listed; anything else is lowercased and namespaced.",
+    "FAST_DIGGING": "minecraft:haste",
+    "SLOW_DIGGING": "minecraft:mining_fatigue",
+    "INCREASE_DAMAGE": "minecraft:strength",
+    "DAMAGE_RESISTANCE": "minecraft:resistance",
+    "SLOW_FALLING": "minecraft:slow_falling",
+    "CONFUSION": "minecraft:nausea",
+    "HARM": "minecraft:instant_damage",
+    "HEAL": "minecraft:instant_health",
+    "JUMP": "minecraft:jump_boost",
+    "REGENERATION": "minecraft:regeneration",
+    "CONDUIT_POWER": "minecraft:conduit_power",
+    "DOLPHINS_GRACE": "minecraft:dolphins_grace",
+    "HERO_OF_THE_VILLAGE": "minecraft:hero_of_the_village",
+    "WATER_BREATHING": "minecraft:water_breathing",
+    "FIRE_RESISTANCE": "minecraft:fire_resistance",
+    "NIGHT_VISION": "minecraft:night_vision",
+    "ABSORPTION": "minecraft:absorption",
+    "BAD_OMEN": "minecraft:bad_omen",
+    "BLINDNESS": "minecraft:blindness",
+    "DARKNESS": "minecraft:darkness",
+    "GLOWING": "minecraft:glowing",
+    "HUNGER": "minecraft:hunger",
+    "INVISIBILITY": "minecraft:invisibility",
+    "LEVITATION": "minecraft:levitation",
+    "LUCK": "minecraft:luck",
+    "UNLUCK": "minecraft:unluck",
+    "NAUSEA": "minecraft:nausea",
+    "POISON": "minecraft:poison",
+    "SATURATION": "minecraft:saturation",
+    "SLOWNESS": "minecraft:slowness",
+    "SPEED": "minecraft:speed",
+    "STRENGTH": "minecraft:strength",
+    "WEAKNESS": "minecraft:weakness",
+    "WITHER": "minecraft:wither",
+    "TRIAL_OMEN": "minecraft:trial_omen",
+    "RAID_OMEN": "minecraft:raid_omen",
+    "WIND_CHARGED": "minecraft:wind_charged",
+    "WEAVING": "minecraft:weaving",
+    "OOZING": "minecraft:oozing",
+    "INFESTED": "minecraft:infested",
+    "BREATH_OF_THE_WILD": "minecraft:breath_of_the_wild"
+  }
+}

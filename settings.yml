@@ -158,3 +158,38 @@ crop_default_resistance: 0.0
 crop_generate_loot_when_missing: true
 crop_seed_relation_from_bytecode: true
 crop_seed_name_suffixes: ["_seeds", "_seed"]
+
+# --- Формат исходника ---
+# auto      = определить самому (мод-JAR или пак ItemsAdder)
+# mod       = всегда читать как мод (Forge / NeoForge / Fabric / Quilt)
+# itemsadder= всегда читать как пак ItemsAdder (папка contents/)
+source_mode: auto
+
+# --- Импорт ItemsAdder -> CraftEngine ---
+# resource.material в ItemsAdder семантичен (он задаёт ванильный предмет-основу:
+# скорость удара, слот брони, поведение зелья), поэтому он сохраняется.
+ia_preserve_material: true
+# В CraftEngine нет флага "неуязвим к взрывам"; для блоков с no_explosion: true
+# используется это сопротивление (уровень бедрока).
+ia_explosion_immune_resistance: 3600000.0
+# ItemsAdder назначает custom_model_data сам; CraftEngine тоже назначает id
+# моделей сам, поэтому исходные значения только попадают в отчёт.
+ia_force_custom_model_data: false
+ia_generate_furniture: true
+# Локаль, из которой берутся переводы display-name-* / lore-* ключей.
+ia_default_locale: en
+# Переносить consume_seconds / sound / animation из consumable.
+ia_emit_consumable_details: true
+
+# --- Режим «ресурс-пак -> CraftEngine» -------------------------------------
+# Конвертер может взять обычный ресурспак и сгенерировать конфиги из найденных
+# assets/<ns>/models/item/*.json и assets/<ns>/textures/item/*.png.
+
+# В ресурспаке нет материала, поэтому каждому предмету нужен дефолтный.
+# CraftEngine иначе молча подставит nether_brick.
+rp_default_material: nether_brick
+
+# assets/minecraft/ - это переопределение ванильных предметов, а не новый
+# контент. По умолчанию такие ассеты копируются в пак, но предметы из них не
+# создаются (фиксируется в reports/resourcepack.md).
+rp_skip_vanilla_overrides: true
