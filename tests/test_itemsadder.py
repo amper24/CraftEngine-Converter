@@ -113,7 +113,7 @@ class ItemsAdderConversionTests(unittest.TestCase):
         self.assertEqual(self.result["diagnostics"], 0)
 
     def test_source_kind_is_recorded(self):
-        self.assertEqual(self.result["counts"]["items"], 9)
+        self.assertEqual(self.result["counts"]["items"], 10)
         self.assertEqual(self.result["counts"]["blocks"], 1)
         self.assertEqual(self.result["counts"]["furniture"], 1)
         self.assertEqual(self.result["counts"]["recipes"], 1)
@@ -439,7 +439,7 @@ class ItemsAdderArchiveTests(unittest.TestCase):
         result = driver.convert(zip_path, out, settings=Settings(), source="itemsadder")
         self.assertTrue(result["validation"]["valid"], result["validation"])
         self.assertEqual(result["fidelity"]["issues"], [])
-        self.assertEqual(result["counts"]["items"], 9)
+        self.assertEqual(result["counts"]["items"], 10)
 
     def test_zip_with_a_wrapper_directory_is_still_detected(self):
         import shutil
@@ -527,6 +527,42 @@ class ItemsAdderEquipmentAssetTests(unittest.TestCase):
         self.assertFalse((out / "resourcepack" / "assets" / NS / "equipment" / "rubyarmor.json").exists())
         report = (out / "reports" / "itemsadder.md").read_text(encoding="utf-8")
         self.assertIn("none resolved", report)
+
+
+class ItemsAdderBookTests(unittest.TestCase):
+    """`behaviours.book` -> `data.written_book_content`."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.out = Path(cls.tmp.name) / "converted"
+        settings = Settings()
+        settings.write_conversion_log = False
+        driver.convert(build_fixture(), cls.out, settings=settings, source="itemsadder")
+        cls.tome = _load(cls.out / "configuration" / "items" / NS / "ruby_tome.yml")["items"][f"{NS}:ruby_tome"]
+        cls.report = (cls.out / "reports" / "itemsadder.md").read_text(encoding="utf-8")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_static_pages_are_converted(self):
+        content = self.tome["data"]["components"]["written_book_content"]
+        self.assertEqual(content["pages"], ["Page one, plain text.", "Page two, plain text."])
+        self.assertEqual(content["title"], "Tome of Rubies")
+        self.assertEqual(content["author"], "rubbishpack")
+
+    def test_interactive_page_is_skipped_and_reported(self):
+        """The ledger must not claim a page was skipped while still emitting it."""
+        content = self.tome["data"]["components"]["written_book_content"]
+        self.assertEqual(len(content["pages"]), 2)
+        self.assertNotIn("<player>", " ".join(content["pages"]))
+        self.assertIn("1 page(s) with placeholders or interactive content were skipped", self.report)
+
+    def test_bow_behaviour_is_reported_as_unsupported_not_promised(self):
+        """`allowed_projectiles` is not a CE 26.8 key, so it must not be claimed."""
+        self.assertNotIn("allowed_projectiles", self.report)
+        self.assertIn("no projectile whitelist", self.report)
 
 
 class ItemsAdderRootKeyTests(unittest.TestCase):

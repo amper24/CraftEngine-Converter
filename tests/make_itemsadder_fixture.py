@@ -202,6 +202,25 @@ items:
           - message:
               text: "Equipped"
 
+  ruby_tome:
+    display_name: Ruby Tome
+    resource:
+      material: WRITTEN_BOOK
+      generate: true
+      textures:
+        - item/ruby.png
+    behaviours:
+      book:
+        title: "Tome of Rubies"
+        author: rubbishpack
+        pages:
+          - "Page one, plain text."
+          - text: "Page two, plain text."
+          - text: "<player> triggered this"
+            interactive: true
+      bow:
+        draw_speed: 1.5
+
   ruby_apple:
     display_name: Ruby Apple
     resource:

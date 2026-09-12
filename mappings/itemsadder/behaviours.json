@@ -62,14 +62,14 @@
       "note": "Container GUI is an ItemsAdder runtime feature."
     },
     "quiver": {
-      "support": "partial",
-      "target": "allowed_projectiles",
-      "note": "settings.allowed_projectiles covers the bow/crossbow ammo side; the storage side has no equivalent."
+      "support": "unsupported",
+      "target": "-",
+      "note": "CraftEngine 26.8 has no projectile whitelist key; draw speed and arrow damage come from the vanilla bow/crossbow material, so only the model and stats travel."
     },
     "book": {
       "support": "partial",
-      "target": "written_book_content",
-      "note": "Static pages can move to data.written_book_content; interactive pages cannot."
+      "target": "data.written_book_content",
+      "note": "Static text pages move to data.written_book_content; IA placeholders and interactive pages do not."
     },
     "liquid_bucket": {
       "support": "unsupported",
@@ -82,14 +82,14 @@
       "note": "Review: ItemsAdder crops are block variants; CraftEngine needs a crop_block behavior with an age property."
     },
     "bow": {
-      "support": "partial",
-      "target": "allowed_projectiles",
-      "note": "Draw speed/arrow damage come from the vanilla bow material."
+      "support": "unsupported",
+      "target": "-",
+      "note": "CraftEngine 26.8 has no projectile whitelist key; draw speed and arrow damage come from the vanilla bow/crossbow material, so only the model and stats travel."
     },
     "crossbow": {
-      "support": "partial",
-      "target": "allowed_projectiles",
-      "note": "Charge time comes from the vanilla crossbow material."
+      "support": "unsupported",
+      "target": "-",
+      "note": "CraftEngine 26.8 has no projectile whitelist key; draw speed and arrow damage come from the vanilla bow/crossbow material, so only the model and stats travel."
     },
     "spear": {
       "support": "unsupported",
@@ -124,7 +124,8 @@
     },
     "book": {
       "support": "partial",
-      "note": "See behaviours.book."
+      "target": "data.written_book_content",
+      "note": "Static text pages move to data.written_book_content; IA placeholders and interactive pages do not."
     },
     "vehicle": {
       "support": "unsupported",
@@ -159,12 +160,14 @@
       "note": "See behaviours.crop."
     },
     "bow": {
-      "support": "partial",
-      "note": "See behaviours.bow."
+      "support": "unsupported",
+      "target": "-",
+      "note": "CraftEngine 26.8 has no projectile whitelist key; draw speed and arrow damage come from the vanilla bow/crossbow material, so only the model and stats travel."
     },
     "crossbow": {
-      "support": "partial",
-      "note": "See behaviours.crossbow."
+      "support": "unsupported",
+      "target": "-",
+      "note": "CraftEngine 26.8 has no projectile whitelist key; draw speed and arrow damage come from the vanilla bow/crossbow material, so only the model and stats travel."
     },
     "spear": {
       "support": "unsupported",

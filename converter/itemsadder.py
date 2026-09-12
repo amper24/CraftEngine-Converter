@@ -1407,6 +1407,40 @@ class ItemsAdderAnalyzer:
             node.equip = equippable
 
     # --- behaviours -----------------------------------------------------------
+    def _apply_book(self, node: ItemNode, full_id: str, cfg: dict[str, Any],
+                  origin: str = "book") -> None:
+        """Move static ItemsAdder book pages into ``data.written_book_content``.
+
+        Only plain text survives: ItemsAdder placeholders and interactive pages
+        have no CraftEngine counterpart, so anything else is reported rather
+        than emitted as a broken page.
+        """
+        pages_out: list[str] = []
+        skipped = 0
+        for page in cfg.get("pages") or []:
+            if isinstance(page, str):
+                pages_out.append(page)
+            elif isinstance(page, dict) and isinstance(page.get("text"), str) and not set(page) - {"text"}:
+                pages_out.append(page["text"])
+            else:
+                # Interactive/placeholder pages cannot be static text; emitting
+                # them would contradict the ledger row below.
+                skipped += 1
+        if not pages_out:
+            self.ledger.add(full_id, "item", origin, "-", "unsupported",
+                            "No plain-text pages found; CraftEngine books need static text.")
+            return
+        content: dict[str, Any] = {"pages": pages_out}
+        for src, dst in (("title", "title"), ("author", "author")):
+            if isinstance(cfg.get(src), str):
+                content[dst] = cfg[src]
+        node.components["written_book_content"] = content
+        note = "Static pages converted."
+        if skipped:
+            note += f" {skipped} page(s) with placeholders or interactive content were skipped."
+        self.ledger.add(full_id, "item", origin, "data.written_book_content",
+                        "partial" if skipped else "transform", note)
+
     def _apply_behaviours(
         self,
         result: AnalysisResult,
@@ -1456,8 +1490,14 @@ class ItemsAdderAnalyzer:
                 node.components["jukebox_playable"] = str(song)
                 self.ledger.add(full_id, "item", "behaviours.music_disc", "data.jukebox_playable", "transform")
 
+        book_cfg = behaviours.get("book") or specific.get("book")
+        if isinstance(book_cfg, dict):
+            origin = "behaviours.book" if "book" in behaviours else "specific_properties.book"
+            self._apply_book(node, full_id, book_cfg, origin)
+
         for key in behaviours:
-            if key in ("block", "furniture", "compostable", "hat", "fire_resistant", "music_disc"):
+            if key in ("block", "furniture", "compostable", "hat", "fire_resistant", "music_disc",
+                       "book"):
                 continue
             spec = self.behaviour_map.get(str(key), {})
             self.ledger.add(
@@ -1467,7 +1507,7 @@ class ItemsAdderAnalyzer:
                 spec.get("note", "No CraftEngine equivalent registered in mappings/itemsadder/behaviours.json."),
             )
         for key in specific:
-            if key in ("block", "armor", "furniture"):
+            if key in ("block", "armor", "furniture", "book"):
                 continue
             spec = self.specific_map.get(str(key), {})
             self.ledger.add(
