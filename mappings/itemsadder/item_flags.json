@@ -1,0 +1,82 @@
+{
+  "description": "ItemsAdder/Bukkit item_flags -> CraftEngine data.hide_tooltip entries. CraftEngine writes component names without the minecraft: prefix (see https://ce-pre.gtemc.cn/configuration/item/data#hide_tooltip).",
+  "sources": [
+    "https://wiki.itemsadder.com/adding-content/items/item-properties/basic",
+    "https://hub.spigotmc.org/javadocs/spigot/org/bukkit/inventory/ItemFlag.html"
+  ],
+  "flags": {
+    "HIDE_ATTRIBUTES": {
+      "hide_tooltip": [
+        "attribute_modifiers"
+      ],
+      "support": "direct"
+    },
+    "HIDE_ENCHANTS": {
+      "hide_tooltip": [
+        "enchantments"
+      ],
+      "support": "direct"
+    },
+    "HIDE_UNBREAKABLE": {
+      "hide_tooltip": [
+        "unbreakable"
+      ],
+      "support": "direct"
+    },
+    "HIDE_DESTROYS": {
+      "hide_tooltip": [
+        "can_break"
+      ],
+      "support": "direct"
+    },
+    "HIDE_PLACED_ON": {
+      "hide_tooltip": [
+        "can_place_on"
+      ],
+      "support": "direct"
+    },
+    "HIDE_POTION_EFFECTS": {
+      "hide_tooltip": [
+        "potion_contents"
+      ],
+      "support": "transform",
+      "note": "Bukkit's HIDE_POTION_EFFECTS hides every 'additional tooltip' section. CraftEngine hides the exact component listed; add stored_enchantments/banner_patterns/trim if the item carries those too."
+    },
+    "HIDE_DYE": {
+      "hide_tooltip": [
+        "dyed_color"
+      ],
+      "support": "direct"
+    },
+    "HIDE_ARMOR_TRIM": {
+      "hide_tooltip": [
+        "trim"
+      ],
+      "support": "direct"
+    },
+    "HIDE_STORED_ENCHANTS": {
+      "hide_tooltip": [
+        "stored_enchantments"
+      ],
+      "support": "direct"
+    },
+    "HIDE_ADDITIONAL_TOOLTIP": {
+      "hide_tooltip": [
+        "charge_type",
+        "jukebox_playable",
+        "banner_patterns",
+        "pot_decorations",
+        "instrument",
+        "container",
+        "suspicious_stew_effects"
+      ],
+      "support": "transform",
+      "note": "Expanded to the vanilla components that make up Bukkit's 'additional tooltip' section."
+    },
+    "HIDE_CREATIVE_SLOT": {
+      "hide_tooltip": [],
+      "support": "unsupported",
+      "note": "Creative-inventory visibility is a Bukkit ItemMeta concept with no CraftEngine data component."
+    }
+  }
+}

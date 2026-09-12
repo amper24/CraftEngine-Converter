@@ -6,6 +6,7 @@ object id (one item / one block / one recipe / one loot table).
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -13,7 +14,7 @@ import yaml
 
 from . import capability, schema, status, util
 from .analyzer import AnalysisResult
-from .ir import BlockNode, BlockStateNode, ItemNode, LootNode, RecipeNode
+from .ir import BlockNode, BlockStateNode, FurnitureNode, ItemNode, LootNode, RecipeNode
 
 
 @dataclass
@@ -89,6 +90,10 @@ class Generator:
         from .config import Settings
 
         self.settings = settings or Settings()
+        # Which import adapter produced this IR. Read defensively so the
+        # generator also works with the lightweight analysis stubs the tests
+        # use, matching how the packager reads optional analysis fields.
+        self.source_kind = getattr(analysis, "source_kind", "mod")
 
     def generate(self) -> GenerationResult:
         out = GenerationResult()
@@ -98,11 +103,13 @@ class Generator:
             self._generate_item(out, self.analysis.items[item_id])
         for block_id in sorted(self.analysis.blocks):
             self._generate_block(out, self.analysis.blocks[block_id])
+        for furniture_id in sorted(getattr(self.analysis, "furniture", {}) or {}):
+            self._generate_furniture(out, self.analysis.furniture[furniture_id])
         self._generate_sounds(out)
 
         # Stable domain ordering. Categories and their translations always
         # remain at the end of the generated package.
-        domain_order = {status.DOMAIN_ITEM: 10, status.DOMAIN_BLOCK: 20, "sound": 30, status.DOMAIN_RECIPE: 40, status.DOMAIN_LOOT: 50, status.DOMAIN_SLICEBOARD: 60, "category": 90, "lang": 95}
+        domain_order = {status.DOMAIN_ITEM: 10, status.DOMAIN_BLOCK: 20, status.DOMAIN_FURNITURE: 25, "sound": 30, status.DOMAIN_RECIPE: 40, status.DOMAIN_LOOT: 50, status.DOMAIN_SLICEBOARD: 60, "category": 90, "lang": 95}
         mode = getattr(self.settings, "recipe_sort_mode", "type_then_id")
         def sort_key(f: GeneratedFile):
             if f.domain == status.DOMAIN_RECIPE:
@@ -152,6 +159,17 @@ class Generator:
         carrier_material = self._semantic_carrier_material(item)
         if carrier_material and not is_block_item:
             body["material"] = carrier_material
+        elif (
+            item.base_material
+            and self.source_kind == "itemsadder"
+            and getattr(self.settings, "ia_preserve_material", True)
+        ):
+            # ItemsAdder's `resource.material` is source data, not an invention:
+            # it selects the vanilla item the custom item is built on, which
+            # decides swing speed, armor slot, potion behaviour, etc. Dropping
+            # it would silently change the item, so it is preserved - including
+            # for block items, where the mod path deliberately omits material.
+            body["material"] = item.base_material
 
         # CraftEngine's model system is the source of truth. For 1.21.4+
         # packs, configure `model`/`texture` and let CraftEngine generate the
@@ -235,6 +253,56 @@ class Generator:
             slot = next((x for x in ("helmet","chestplate","leggings","boots") if x in item.id.split(":")[-1].lower()), None)
             if slot:
                 data.setdefault("equippable", {"slot": {"helmet":"head","chestplate":"chest","leggings":"legs","boots":"feet"}[slot]})
+
+        # Generic data-component emission for values the source adapter placed
+        # directly on the IR node. Each of these is only written when the source
+        # actually declared it, so conversions that never populate them (the
+        # mod adapter) are unaffected.
+        if item.attributes:
+            # Source-declared modifiers win over anything inferred earlier
+            # (gear heuristics / brain), matched on type+slot so the same
+            # attribute is never emitted twice.
+            source_keys = {(m.get("type"), m.get("slot", "mainhand")) for m in item.attributes}
+            kept = [
+                m for m in data.get("attribute_modifiers", [])
+                if (m.get("type"), m.get("slot", "mainhand")) not in source_keys
+            ]
+            data["attribute_modifiers"] = kept + list(item.attributes)
+        if item.equip:
+            equippable = dict(data.get("equippable") or {})
+            equippable.update(item.equip)
+            data["equippable"] = equippable
+        if item.enchantments:
+            data["enchantments"] = {k: v for k, v in sorted(item.enchantments.items())}
+        if item.lore and not data.get("lore"):
+            data["lore"] = [f"<!i>{line}" for line in item.lore]
+        for key, value in (item.components or {}).items():
+            if value is None:
+                continue
+            if key in ("hide_tooltip", "unbreakable", "dyed_color", "tooltip_style", "jukebox_playable"):
+                data[key] = value
+            elif key == "raw":
+                raw_components = dict(data.get("components") or {})
+                raw_components.update(value)
+                data["components"] = raw_components
+            else:
+                components = dict(data.get("components") or {})
+                components[key] = value
+                data["components"] = components
+        if item.food is not None and self.source_kind == "itemsadder":
+            details = (item.metadata or {}).get("consumable") or {}
+            if details and getattr(self.settings, "ia_emit_consumable_details", True):
+                consumable = dict(data.get("consumable") or {})
+                consumable.update(details)
+                data["consumable"] = consumable
+        if (
+            self.source_kind == "itemsadder"
+            and getattr(self.settings, "ia_force_custom_model_data", False)
+        ):
+            cmd = ((item.metadata or {}).get("itemsadder") or {}).get("custom_model_data")
+            if isinstance(cmd, int):
+                body["custom_model_data"] = cmd
+
         if data:
             body["data"] = data
 
@@ -322,6 +390,103 @@ class Generator:
         return category if category in self._category_names else None
 
     # --- categories -------------------------------------------------------
+    def _generate_source_categories(self, out: GenerationResult) -> bool:
+        """Generate categories from the source pack's own category definitions.
+
+        ItemsAdder ships explicit ``categories:`` sections (the /ia GUI
+        grouping) including wildcards and regex membership. Those are more
+        accurate than anything we could infer, so they win over semantic
+        grouping whenever the source provides them.
+        """
+        source_categories = getattr(self.analysis, "source_categories", {}) or {}
+        if not source_categories:
+            return False
+
+        generated_item_ids = {
+            str(f.object_id) for f in out.files
+            if f.domain == status.DOMAIN_ITEM and f.object_id
+        }
+        if not generated_item_ids:
+            return False
+
+        emitted = False
+        for ns, categories in sorted(source_categories.items()):
+            cats: dict[str, dict[str, Any]] = {}
+            priority = 1
+            for cat_id, cat in sorted(categories.items()):
+                members = self._expand_source_members(cat.get("items"), ns, generated_item_ids)
+                if not members:
+                    continue
+                icon = self._resolve_source_icon(cat.get("icon"), ns, members, generated_item_ids)
+                name = cat.get("name")
+                entry = _ordered()
+                entry["priority"] = priority
+                entry["name"] = f"<!i>{name}" if name else f"<!i>{cat_id.replace('_', ' ').title()}"
+                if cat.get("title"):
+                    entry["lore"] = [f"<!i>{cat['title']}"]
+                entry["icon"] = icon
+                entry["list"] = members
+                cats[f"{ns}:{util.safe_name(str(cat_id))}"] = entry
+                priority += 1
+            if not cats:
+                continue
+            emitted = True
+            out.add_file(GeneratedFile(
+                rel_path=f"configuration/categories/{ns}.yml",
+                object_id=f"{ns}:source_categories",
+                domain="category",
+                content=dump_yaml({"categories": cats}),
+                result=status.DIRECT,
+            ))
+        return emitted
+
+    def _expand_source_members(
+        self, patterns: Any, ns: str, generated_item_ids: set[str]
+    ) -> list[str]:
+        """Resolve an ItemsAdder category ``items`` list to concrete ids.
+
+        ItemsAdder accepts literal ids, ``namespace:*`` wildcards and full
+        regular expressions; all three are resolved against the items that were
+        actually generated so no category can reference a dropped object.
+        """
+        if not isinstance(patterns, list):
+            return []
+        members: list[str] = []
+        for pattern in patterns:
+            text = str(pattern).strip()
+            if not text:
+                continue
+            if text.endswith(":*"):
+                prefix = text[:-1]
+                members.extend(i for i in generated_item_ids if i.startswith(prefix))
+            elif ":" not in text:
+                candidate = f"{ns}:{text}"
+                if candidate in generated_item_ids:
+                    members.append(candidate)
+            elif text in generated_item_ids:
+                members.append(text)
+            else:
+                # Treat anything else as a regex, which is how ItemsAdder
+                # documents advanced membership rules.
+                try:
+                    matcher = re.compile(text)
+                except re.error:
+                    continue
+                members.extend(i for i in generated_item_ids if matcher.fullmatch(i))
+        return sorted(dict.fromkeys(members), key=str.lower)
+
+    def _resolve_source_icon(
+        self, icon: Any, ns: str, members: list[str], generated_item_ids: set[str]
+    ) -> str:
+        """Pick a CraftEngine category icon (always a generated item id)."""
+        if icon:
+            text = str(icon).strip()
+            if text in generated_item_ids:
+                return text
+            if ":" not in text and f"{ns}:{text}" in generated_item_ids:
+                return f"{ns}:{text}"
+        return members[0]
+
     def _generate_categories(self, out: GenerationResult) -> None:
         """Generate CraftEngine categories as the final generation phase.
 
@@ -337,6 +502,11 @@ class Generator:
         filtering pass (excluded namespaces, unresolved entries, display-only
         stages, etc.).
         """
+        # A source pack that declares its own categories (ItemsAdder) is more
+        # authoritative than semantic inference, so those win outright.
+        if self._generate_source_categories(out):
+            return
+
         names = list(self._category_names)
         labels = {
             "Crops": ("crops", "Растения", "Crops", "#7CB342"),
@@ -566,6 +736,41 @@ class Generator:
                 object_id=block.id,
                 domain=status.DOMAIN_BLOCK,
                 content=content,
+                result=result,
+            )
+        )
+
+    def _generate_furniture(self, out: GenerationResult, furniture: FurnitureNode) -> None:
+        """Emit a CraftEngine furniture definition.
+
+        Only ``variants`` is mandatory in CraftEngine; ``settings`` carries the
+        placement item and sounds. Light emission is a separate behavior.
+        """
+        decision = self.mapping.get(furniture.id)
+        result = decision.result if decision else status.DIRECT
+        ns, path = util.split_id(furniture.id)
+
+        body = _ordered()
+        settings = _ordered_from(furniture.settings) if furniture.settings else _ordered()
+        if furniture.light_level:
+            body.setdefault("behaviors", []).append(
+                {"type": "glowing_furniture", "light_level": int(furniture.light_level)}
+            )
+        if settings:
+            body["settings"] = settings
+        body["variants"] = _ordered_from(furniture.variants)
+        if furniture.loot_item:
+            body["loot"] = {
+                "template": "default:loot_table/furniture",
+                "arguments": {"item": furniture.loot_item},
+            }
+
+        out.add_file(
+            GeneratedFile(
+                rel_path=f"configuration/furniture/{ns}/{util.safe_name(path)}.yml",
+                object_id=furniture.id,
+                domain=status.DOMAIN_FURNITURE,
+                content=dump_yaml({"furniture": {furniture.id: dict(body)}}),
                 result=result,
             )
         )
@@ -1432,7 +1637,7 @@ def generate_all(
     # they truly are the final semantic-generation phase.
 
     mode = getattr(generator.settings, "recipe_sort_mode", "type_then_id")
-    domain_order = {status.DOMAIN_ITEM: 10, status.DOMAIN_BLOCK: 20, "sound": 30, status.DOMAIN_RECIPE: 40, status.DOMAIN_LOOT: 50, status.DOMAIN_SLICEBOARD: 60, "category": 90, "lang": 95}
+    domain_order = {status.DOMAIN_ITEM: 10, status.DOMAIN_BLOCK: 20, status.DOMAIN_FURNITURE: 25, "sound": 30, status.DOMAIN_RECIPE: 40, status.DOMAIN_LOOT: 50, status.DOMAIN_SLICEBOARD: 60, "category": 90, "lang": 95}
     def final_sort_key(f: GeneratedFile):
         if f.domain == status.DOMAIN_RECIPE:
             rel = f.rel_path.lower().split("/")

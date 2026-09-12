@@ -25,6 +25,89 @@
   команды для проверки каждого объекта.
 - Отчёты (summary / semantics / commands / unsupported / partial / manual-tasks /
   warnings / validation), manifest, source-map и README результата.
+- **Режим ItemsAdder → CraftEngine**: читает пак `contents/` плагина ItemsAdder
+  (предметы, блоки, мебель, категории, lang, текстуры и модели) и строит из него
+  пакет CraftEngine тем же конвейером.
+
+## Режим ItemsAdder → CraftEngine
+
+Конвертер принимает не только мод-JAR, но и **пак контента ItemsAdder** — папку
+`plugins/ItemsAdder/contents/` (или саму `contents/`, или папку одного
+namespace). Формат определяется автоматически; принудительно — флагом
+`--source itemsadder` или `source_mode: itemsadder` в `settings.yml`.
+
+ItemsAdder описывает контент декларативно в YAML, поэтому вместо чтения
+байткода конвертер разбирает эти файлы и строит **тот же самый IR**. Дальше
+работает обычный конвейер: семантика → capability → генератор → пакет →
+валидатор. Никакого отдельного «второго конвертера» нет.
+
+```bash
+# автоопределение
+python -m converter convert plugins/ItemsAdder/contents --output converted/mypack
+
+# то же самое явно
+python -m converter convert plugins/ItemsAdder/contents \
+  --source itemsadder --output converted/mypack
+```
+
+### Что переносится
+
+| ItemsAdder | CraftEngine |
+| --- | --- |
+| `display_name` / `name` (включая ключи `display-name-*` из `lang:`) | `data.item_name` |
+| `lore` | `data.lore` |
+| `resource.material` | `material` (сохраняется: в IA это предмет-основа) |
+| `resource.generate: true` + `textures` | `texture` / `textures` (или `minecraft:item/handheld` для инструментов) |
+| `resource.generate: false` + `model_path` | `model: {type: minecraft:model, path: …}` |
+| `attribute_modifiers` (camelCase, `SCREAMING_SNAKE`, snake_case и списковая форма) | `data.attribute_modifiers` |
+| `durability.max_durability` / `unbreakable` / `disappear_when_broken` | `data.max_damage` / `data.unbreakable` / `settings.prevent_break` |
+| `enchants`, `item_flags`, `max_stack_size`, `glint`, `fuel` | `data.enchantments`, `data.hide_tooltip`, `data.components`, `settings.fuel_time` |
+| `consumable` и старый `events.eat/drink.feed` | `data.food` + `data.consumable` |
+| `specific_properties.armor` + `armors_rendering` | `data.equippable` (`slot`, `asset_id`) |
+| `behaviours.block` (`placed_model.type`, `hardness`, `light_level`, звуки, инструменты) | блок + `behavior: block_item`, `state.auto_state`, `settings.*` |
+| `behaviours.furniture` (hitbox, `display_transformation`, `placeable_on`, свет) | мебель + `behavior: furniture_item`, `variants`, `glowing_furniture` |
+| `drop.break_block.loots` (шанс 0–100) | loot-таблица (вероятность 0–1) |
+| `categories` (включая `ns:*` и regex) | `categories` |
+| `lang` | `assets/<ns>/lang/<locale>.json` |
+| `textures/`, `models/`, `resources/resourcepack/assets/` | `resourcepack/assets/<ns>/…` |
+| `data/<ns>/recipes/*.json` внутри пака | рецепты (тот же парсер, что и для модов) |
+| `template` / `variant_of` | разворачивается наследование, сам шаблон не генерируется |
+
+Соответствия вынесены в data-driven таблицы `mappings/itemsadder/`
+(`attributes.json`, `block_types.json`, `item_flags.json`, `behaviours.json`) —
+их можно править без изменения кода.
+
+### Отчёт о полном переносе
+
+Каждый ключ исходника попадает в `reports/itemsadder.md`: что во что
+превратилось и что требует ручной работы. Ключ без эквивалента не исчезает
+молча — он получает статус `partial` или `unsupported` с пояснением.
+
+```text
+## Summary
+| Support | Keys |
+| direct | 51 |
+| transform | 13 |
+| partial | 1 |
+| unsupported | 5 |
+```
+
+### Настройки
+
+```yaml
+source_mode: auto                    # auto | mod | itemsadder
+ia_preserve_material: true           # сохранять resource.material
+ia_explosion_immune_resistance: 3600000.0   # для блоков с no_explosion: true
+ia_force_custom_model_data: false    # не навязывать model_id из IA
+ia_generate_furniture: true
+ia_default_locale: en                # откуда брать переводы display-name-*
+ia_emit_consumable_details: true
+```
+
+В GUI формат выбирается в выпадающем списке «Источник». Для пака ItemsAdder
+диалог маппинга namespace (он нужен только SliceBoard) пропускается, а в лог
+выводится распознанная раскладка: namespace'ы, число конфигов и где лежат
+ресурсы.
 
 ## Структура
 
@@ -35,6 +118,7 @@ converter/
   detector.py   ModDetector (loader/namespace/metadata)
   archive.py    чтение JAR/директории
   analyzer.py   IR: items/blocks/states/recipes/loot/tags/lang
+  itemsadder.py импорт пака ItemsAdder (contents/) в тот же IR
   ir.py         IR-модели
   capability.py capability/mapping engine
   generator.py  генерация CraftEngine YAML
@@ -51,6 +135,7 @@ converter/
 models/brain/               веса микро-нейросети (.npz, ~2 МБ на голову)
 schemas/craftengine/26.8/   машиночитаемые target-схемы
 mappings/                   data-driven mapping-правила
+mappings/itemsadder/        таблицы соответствия ItemsAdder -> CraftEngine
 tests/                      фикстура и проверки
 ```
 

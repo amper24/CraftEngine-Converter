@@ -1,0 +1,208 @@
+{
+  "description": "ItemsAdder item `behaviours:` / `specific_properties:` keys -> CraftEngine representation. The generator only emits target keys listed here; anything else becomes a report entry instead of being guessed.",
+  "sources": [
+    "https://wiki.itemsadder.com/adding-content/items/item-properties/behaviours",
+    "https://ce-pre.gtemc.cn/configuration/item/behaviors",
+    "https://ce-pre.gtemc.cn/configuration/furniture"
+  ],
+  "behaviours": {
+    "block": {
+      "support": "direct",
+      "target": "block_item",
+      "note": "Generates a CraftEngine block plus an item behavior block_item pointing at it."
+    },
+    "furniture": {
+      "support": "direct",
+      "target": "furniture_item",
+      "note": "Generates a CraftEngine furniture plus an item behavior furniture_item pointing at it."
+    },
+    "compostable": {
+      "support": "direct",
+      "target": "compostable_item",
+      "note": "chance -> behavior.compostable_item.chance"
+    },
+    "hat": {
+      "support": "transform",
+      "target": "equippable_head",
+      "note": "Wearable head item -> data.equippable {slot: head}."
+    },
+    "elytra": {
+      "support": "transform",
+      "target": "equippable_body",
+      "note": "data.equippable {slot: body}; elytra flight physics come from the material, not from a behavior."
+    },
+    "music_disc": {
+      "support": "transform",
+      "target": "jukebox_playable",
+      "note": "song -> data.jukebox_playable."
+    },
+    "fire_resistant": {
+      "support": "transform",
+      "target": "invulnerable",
+      "note": "settings.invulnerable with the fire/lava damage sources."
+    },
+    "throwable": {
+      "support": "partial",
+      "target": "projectile",
+      "note": "settings.projectile exists in CraftEngine, but ItemsAdder's throwable trajectory/speed has no 1:1 field."
+    },
+    "liquid_analyzer": {
+      "support": "unsupported",
+      "target": null,
+      "note": "No CraftEngine equivalent."
+    },
+    "vehicle": {
+      "support": "unsupported",
+      "target": null,
+      "note": "Custom rideable vehicles are outside CraftEngine's block/item/furniture model."
+    },
+    "backpack": {
+      "support": "unsupported",
+      "target": null,
+      "note": "Container GUI is an ItemsAdder runtime feature."
+    },
+    "quiver": {
+      "support": "partial",
+      "target": "allowed_projectiles",
+      "note": "settings.allowed_projectiles covers the bow/crossbow ammo side; the storage side has no equivalent."
+    },
+    "book": {
+      "support": "partial",
+      "target": "written_book_content",
+      "note": "Static pages can move to data.written_book_content; interactive pages cannot."
+    },
+    "liquid_bucket": {
+      "support": "unsupported",
+      "target": null,
+      "note": "Custom liquids are a separate ItemsAdder subsystem."
+    },
+    "crop": {
+      "support": "partial",
+      "target": "crop_block",
+      "note": "Review: ItemsAdder crops are block variants; CraftEngine needs a crop_block behavior with an age property."
+    },
+    "bow": {
+      "support": "partial",
+      "target": "allowed_projectiles",
+      "note": "Draw speed/arrow damage come from the vanilla bow material."
+    },
+    "crossbow": {
+      "support": "partial",
+      "target": "allowed_projectiles",
+      "note": "Charge time comes from the vanilla crossbow material."
+    },
+    "spear": {
+      "support": "unsupported",
+      "target": null,
+      "note": "CraftEngine has no thrown-spear behavior; the melee side survives as a normal item."
+    }
+  },
+  "specific_properties": {
+    "item": {
+      "support": "transform",
+      "note": "specific_properties.item.custom_model_data is recorded; CraftEngine assigns model ids itself unless ia_force_custom_model_data is enabled."
+    },
+    "armor": {
+      "support": "direct",
+      "note": "slot -> data.equippable.slot; custom_armor -> data.equippable.asset_id."
+    },
+    "block": {
+      "support": "direct",
+      "note": "Legacy block definition location (same shape as behaviours.block)."
+    },
+    "potion": {
+      "support": "partial",
+      "note": "Base potion type/color survive as data.components; custom effect lists do not."
+    },
+    "shield": {
+      "support": "partial",
+      "note": "Block cooldown comes from the vanilla shield material."
+    },
+    "bundle": {
+      "support": "partial",
+      "note": "Bundle capacity comes from the vanilla bundle material."
+    },
+    "book": {
+      "support": "partial",
+      "note": "See behaviours.book."
+    },
+    "vehicle": {
+      "support": "unsupported",
+      "note": "See behaviours.vehicle."
+    },
+    "liquid_analyzer": {
+      "support": "unsupported",
+      "note": "See behaviours.liquid_analyzer."
+    },
+    "fire_resistant": {
+      "support": "transform",
+      "note": "See behaviours.fire_resistant."
+    },
+    "music_disc": {
+      "support": "transform",
+      "note": "See behaviours.music_disc."
+    },
+    "hat": {
+      "support": "transform",
+      "note": "See behaviours.hat."
+    },
+    "throwable": {
+      "support": "partial",
+      "note": "See behaviours.throwable."
+    },
+    "liquid_bucket": {
+      "support": "unsupported",
+      "note": "See behaviours.liquid_bucket."
+    },
+    "crop": {
+      "support": "partial",
+      "note": "See behaviours.crop."
+    },
+    "bow": {
+      "support": "partial",
+      "note": "See behaviours.bow."
+    },
+    "crossbow": {
+      "support": "partial",
+      "note": "See behaviours.crossbow."
+    },
+    "spear": {
+      "support": "unsupported",
+      "note": "See behaviours.spear."
+    },
+    "fishing_rod": {
+      "support": "direct",
+      "note": "Handled by the vanilla fishing_rod material plus the item model."
+    }
+  },
+  "item_keys": {
+    "display_name": "data.item_name",
+    "name": "data.item_name",
+    "lore": "data.lore",
+    "attribute_modifiers": "data.attribute_modifiers",
+    "durability": "data.max_damage / settings.prevent_break",
+    "max_stack_size": "data.components.max_stack_size",
+    "item_flags": "data.hide_tooltip",
+    "enchants": "data.enchantments",
+    "blocked_enchants": "settings.enchantable",
+    "glint": "data.components.enchantment_glint_override",
+    "glow": "settings.glow_color",
+    "drop": "settings.drop_display / settings.glow_color",
+    "resource": "material / model / texture",
+    "graphics": "material / model / texture",
+    "consumable": "data.food + data.consumable",
+    "fuel": "settings.fuel_time",
+    "nbt": "data.components",
+    "components_nbt_file": "data.components",
+    "tooltip_style": "data.tooltip_style",
+    "permission": "REPORT",
+    "permission_suffix": "REPORT",
+    "events": "REPORT",
+    "actions": "REPORT",
+    "template": "REPORT",
+    "variant_of": "REPORT",
+    "enabled": "REPORT",
+    "events_needed_player_stats": "REPORT",
+    "show_in_gui": "REPORT"
+  }
+}

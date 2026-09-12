@@ -31,6 +31,7 @@ class App:
         self.out_var = tk.StringVar()
         self.minecraft_var = tk.StringVar(value=self.settings.minecraft_version)
         self.ce_var = tk.StringVar(value=self.settings.craftengine_version)
+        self.source_var = tk.StringVar(value=self.settings.source_mode)
         self.interactive_var = tk.BooleanVar(value=self.settings.interactive_namespace_mapping)
         self.strict_var = tk.BooleanVar(value=self.settings.strict_recipe_mode)
         self.sliceboard_var = tk.BooleanVar(value=self.settings.sliceboard_enabled)
@@ -60,7 +61,7 @@ class App:
         paths_box.pack(fill="x", pady=(10, 8))
         paths_box.columnconfigure(1, weight=1)
 
-        self._path_row(paths_box, 0, "Мод (JAR / папка):", self.mod_var, self._pick_mod, "Файл или папка")
+        self._path_row(paths_box, 0, "Источник (JAR / мод / ItemsAdder):", self.mod_var, self._pick_mod, "Файл или папка")
         self._path_row(paths_box, 1, "Выход:", self.out_var, self._pick_out, "Папка результата")
 
         controls = ttk.Frame(paths_box)
@@ -69,6 +70,14 @@ class App:
         ttk.Entry(controls, textvariable=self.minecraft_var, width=12).pack(side="left", padx=(5, 14))
         ttk.Label(controls, text="CraftEngine:").pack(side="left")
         ttk.Entry(controls, textvariable=self.ce_var, width=10).pack(side="left", padx=(5, 18))
+        ttk.Label(controls, text="Источник:").pack(side="left")
+        ttk.Combobox(
+            controls,
+            textvariable=self.source_var,
+            values=["auto", "mod", "itemsadder"],
+            width=12,
+            state="readonly",
+        ).pack(side="left", padx=(5, 18))
         ttk.Checkbutton(controls, text="Показывать маппинг namespace перед генерацией", variable=self.interactive_var).pack(side="left")
 
         buttons = ttk.Frame(outer)
@@ -88,7 +97,7 @@ class App:
         self.log = scrolledtext.ScrolledText(outer, height=28, state="disabled", font=("Consolas", 9))
         self.log.pack(fill="both", expand=True)
 
-        footer = ttk.Label(outer, text="Fidelity-first • configuration/ + resourcepack/ • SliceBoard • Recipe namespace resolver")
+        footer = ttk.Label(outer, text="Fidelity-first • Mod (Forge/Fabric) и ItemsAdder • configuration/ + resourcepack/ • SliceBoard")
         footer.pack(anchor="w", pady=(6, 0))
 
     @staticmethod
@@ -99,9 +108,12 @@ class App:
         ttk.Button(parent, text="Обзор…", command=command).grid(row=row, column=2, padx=5, pady=4)
 
     def _pick_mod(self) -> None:
-        path = filedialog.askopenfilename(title="Выберите мод", filetypes=[("Minecraft mod", "*.jar"), ("Все файлы", "*.*")])
+        path = filedialog.askopenfilename(title="Выберите мод (JAR)", filetypes=[("Minecraft mod", "*.jar"), ("Все файлы", "*.*")])
         if not path:
-            path = filedialog.askdirectory(title="Или выберите распакованный мод")
+            # ItemsAdder packs and unpacked mods are directories.
+            path = filedialog.askdirectory(
+                title="Или выберите папку: распакованный мод / contents/ плагина ItemsAdder"
+            )
         if path:
             self.mod_var.set(path)
             if not self.out_var.get():
@@ -121,6 +133,7 @@ class App:
     def _sync_settings(self) -> None:
         self.settings.minecraft_version = self.minecraft_var.get().strip() or "1.21.4"
         self.settings.craftengine_version = self.ce_var.get().strip() or "26.8"
+        self.settings.source_mode = self.source_var.get().strip() or "auto"
         self.settings.interactive_namespace_mapping = self.interactive_var.get()
         self.settings.strict_recipe_mode = self.strict_var.get()
         self.settings.sliceboard_enabled = self.sliceboard_var.get()
@@ -129,16 +142,58 @@ class App:
     def _preflight(self) -> None:
         mod = self.mod_var.get().strip()
         if not mod:
-            messagebox.showwarning("Нет мода", "Укажите JAR или папку мода.")
+            messagebox.showwarning("Нет мода", "Укажите JAR, папку мода или папку contents/ плагина ItemsAdder.")
             return
+        self._sync_settings()
         self.progress.start()
         self.status_var.set("Анализ исходника…")
         self._log("=== PREFLIGHT ===")
 
         def work() -> None:
             try:
-                data = driver.suggest_namespace_mappings(mod, self.minecraft_var.get().strip() or "1.21.4", self.settings)
-                self.root.after(0, lambda: self._on_preflight(data))
+                info = driver.describe_source(mod, self.settings)
+                self.root.after(0, lambda: self._on_source_described(info, convert=False))
+            except Exception as exc:
+                self.root.after(0, lambda: self._on_error(exc))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _on_source_described(self, info: dict[str, Any], convert: bool) -> None:
+        """Log what the input turned out to be, then preflight or convert.
+
+        ItemsAdder packs have no external recipe namespaces to resolve, so they
+        skip the SliceBoard namespace dialog entirely.
+        """
+        kind = info.get("kind")
+        if kind == "itemsadder":
+            self.progress.stop()
+            self.status_var.set("ItemsAdder-пак распознан")
+            layout = (info.get("itemsadder") or {})
+            namespaces = layout.get("namespaces", {})
+            self._log(f"Формат: ItemsAdder (contents/)")
+            self._log(f"Корень: {layout.get('contents_root') or '(корень входной папки)'}")
+            self._log(f"Namespace'ов: {len(namespaces)}")
+            for ns, detail in sorted(namespaces.items()):
+                assets = []
+                if detail.get("resourcepack_roots"):
+                    assets.append("resourcepack/")
+                if detail.get("legacy_asset_dirs"):
+                    assets.append("+".join(detail["legacy_asset_dirs"]) + "/")
+                self._log(f"  {ns}: конфигов {len(detail.get('config_files', []))}, ресурсы: {', '.join(assets) or '—'}")
+            if convert:
+                self._start_conversion()
+            return
+
+        # Mod path: keep the existing namespace-resolution preflight.
+        mod = self.mod_var.get().strip()
+
+        def work() -> None:
+            try:
+                data = driver.suggest_namespace_mappings(mod, self.settings.minecraft_version, self.settings)
+                if convert:
+                    self.root.after(0, lambda d=data: self._show_mapping_then_convert(d))
+                else:
+                    self.root.after(0, lambda d=data: self._on_preflight(d))
             except Exception as exc:
                 self.root.after(0, lambda: self._on_error(exc))
 
@@ -169,15 +224,16 @@ class App:
             self.root.after(0, self._start_conversion)
 
         if self.interactive_var.get():
-            # Preflight runs first so namespace mappings are visible/editable.
+            # Preflight runs first: the source format decides whether the
+            # SliceBoard namespace dialog applies at all.
             self.progress.start()
-            self.status_var.set("Проверяем внешние namespace…")
+            self.status_var.set("Определяем формат исходника…")
             self._log("=== PREFLIGHT BEFORE CONVERSION ===")
 
             def work() -> None:
                 try:
-                    data = driver.suggest_namespace_mappings(mod, self.settings.minecraft_version, self.settings)
-                    self.root.after(0, lambda d=data: self._show_mapping_then_convert(d))
+                    info = driver.describe_source(mod, self.settings)
+                    self.root.after(0, lambda d=info: self._on_source_described(d, convert=True))
                 except Exception as exc:
                     self.root.after(0, lambda: self._on_error(exc))
 
@@ -251,6 +307,7 @@ class App:
         self.settings = self.settings_manager.settings
         self.minecraft_var.set(self.settings.minecraft_version)
         self.ce_var.set(self.settings.craftengine_version)
+        self.source_var.set(self.settings.source_mode)
         self.interactive_var.set(self.settings.interactive_namespace_mapping)
         self.strict_var.set(self.settings.strict_recipe_mode)
         self.sliceboard_var.set(self.settings.sliceboard_enabled)

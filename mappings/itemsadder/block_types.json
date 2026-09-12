@@ -1,0 +1,45 @@
+{
+  "description": "ItemsAdder behaviours.block.placed_model.type -> CraftEngine state.auto_state group. CraftEngine registers real blocks the same way ItemsAdder does (note block / mushroom / chorus / tripwire carriers), so the carrier families line up almost exactly.",
+  "sources": [
+    "https://wiki.itemsadder.com/adding-content/blocks/",
+    "https://ce-pre.gtemc.cn/configuration/block/states"
+  ],
+  "types": {
+    "REAL_NOTE": {
+      "auto_state": "note_block",
+      "transparent": false,
+      "support": "direct",
+      "note": "ItemsAdder REAL_NOTE (note_block carrier, ~750 blocks) maps to CraftEngine auto_state: note_block."
+    },
+    "REAL": {
+      "auto_state": "mushroom_stem",
+      "transparent": false,
+      "support": "direct",
+      "note": "ItemsAdder REAL (mushroom carrier, ~191 blocks) maps to CraftEngine auto_state: mushroom_stem."
+    },
+    "REAL_TRANSPARENT": {
+      "auto_state": "chorus",
+      "transparent": true,
+      "support": "direct",
+      "note": "ItemsAdder REAL_TRANSPARENT (chorus carrier, ~63 blocks) maps to CraftEngine auto_state: chorus with transparent: true."
+    },
+    "REAL_WIRE": {
+      "auto_state": "tripwire",
+      "transparent": true,
+      "support": "direct",
+      "note": "ItemsAdder REAL_WIRE (tripwire carrier, ~127 blocks) maps to CraftEngine auto_state: tripwire. shift_up tall-plant variants need multi_high_block."
+    },
+    "TILE": {
+      "auto_state": "solid",
+      "transparent": false,
+      "support": "partial",
+      "note": "ItemsAdder TILE is a retextured spawner with no per-texture limit. CraftEngine has no unlimited-id carrier: the block is generated on a solid carrier, so it consumes a real block id. Review capacity before enabling large TILE sets."
+    },
+    "FIRE": {
+      "auto_state": null,
+      "transparent": false,
+      "support": "unsupported",
+      "note": "ItemsAdder FIRE blocks (custom fire) have no CraftEngine equivalent."
+    }
+  }
+}

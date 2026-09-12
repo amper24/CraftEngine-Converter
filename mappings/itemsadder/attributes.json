@@ -1,0 +1,62 @@
+{
+  "description": "ItemsAdder/Bukkit attribute names -> CraftEngine (vanilla DataComponent) attribute ids. ItemsAdder accepts camelCase (attackDamage), SCREAMING_SNAKE (ATTACK_DAMAGE) and modern snake_case (attack_damage); all three normalize to the same CraftEngine id.",
+  "sources": [
+    "https://wiki.itemsadder.com/adding-content/items/item-properties/basic",
+    "https://hub.spigotmc.org/javadocs/spigot/org/bukkit/attribute/Attribute.html"
+  ],
+  "operations": {
+    "ADD_NUMBER": "add_value",
+    "MULTIPLY_SCALAR_1": "add_multiplied_total",
+    "ADD_SCALAR": "add_multiplied_base",
+    "add_value": "add_value",
+    "add_multiplied_base": "add_multiplied_base",
+    "add_multiplied_total": "add_multiplied_total"
+  },
+  "default_operation": "add_value",
+  "attributes": {
+    "attackDamage": "attack_damage",
+    "attackSpeed": "attack_speed",
+    "attackKnockback": "attack_knockback",
+    "knockbackResistance": "knockback_resistance",
+    "explosiveKnockbackResistance": "explosion_knockback_resistance",
+    "maxHealth": "max_health",
+    "maxAbsorption": "max_absorption",
+    "movementSpeed": "movement_speed",
+    "movementEfficiency": "movement_efficiency",
+    "waterMovementEfficiency": "water_movement_efficiency",
+    "submergedMiningSpeed": "submerged_mining_speed",
+    "flyingSpeed": "flying_speed",
+    "armor": "armor",
+    "armorToughness": "armor_toughness",
+    "luck": "luck",
+    "attackReach": "attack_range",
+    "attackRange": "attack_range",
+    "blockBreakSpeed": "mining_efficiency",
+    "miningEfficiency": "mining_efficiency",
+    "blockInteractionRange": "block_interaction_range",
+    "entityInteractionRange": "entity_interaction_range",
+    "fallDamageMultiplier": "fall_damage_multiplier",
+    "safeFallDistance": "safe_fall_distance",
+    "gravity": "gravity",
+    "scale": "scale",
+    "stepHeight": "step_height",
+    "jumpStrength": "jump_strength",
+    "horseJumpStrength": "jump_strength",
+    "burnTime": "burn_time",
+    "sweepingDamageRatio": "sweeping_damage_ratio",
+    "temptRange": "tempt_range",
+    "oxygenBonus": "oxygen_bonus",
+    "creativeBlockInteractionRange": "creative_block_interaction_range"
+  },
+  "slots": {
+    "mainhand": "mainhand",
+    "offhand": "offhand",
+    "head": "head",
+    "chest": "chest",
+    "legs": "legs",
+    "feet": "feet",
+    "body": "body",
+    "any": "any"
+  },
+  "note": "CraftEngine's data.attribute_modifiers sets the vanilla attribute_modifiers component, which REPLACES the material's default modifiers - exactly like Bukkit ItemMeta.addAttributeModifier after stripping defaults. Amounts therefore transfer 1:1 for ADD_NUMBER."
+}

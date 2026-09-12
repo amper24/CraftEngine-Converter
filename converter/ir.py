@@ -234,6 +234,40 @@ class RecipeNode(BaseNode):
 
 
 @dataclass
+class FurnitureNode(BaseNode):
+    """Entity-based decoration (ItemsAdder furniture -> CraftEngine furniture).
+
+    ``variants`` mirrors the CraftEngine furniture section of the same name:
+    each variant holds ``elements`` (display entities) and ``hitboxes``
+    (collision boxes, optional seats).
+    """
+
+    item: str | None = None
+    display_name: str | None = None
+    variants: dict[str, Any] = field(default_factory=dict)
+    settings: dict[str, Any] = field(default_factory=dict)
+    loot_item: str | None = None
+    light_level: int | None = None
+    # Source-side provenance that has no CraftEngine key; kept for the reports.
+    unmapped: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        data = super().to_dict()
+        data.update(
+            {
+                "item": self.item,
+                "display_name": self.display_name,
+                "variants": self.variants,
+                "settings": self.settings,
+                "loot_item": self.loot_item,
+                "light_level": self.light_level,
+                "unmapped": self.unmapped,
+            }
+        )
+        return data
+
+
+@dataclass
 class LootNode(BaseNode):
     raw: dict[str, Any] = field(default_factory=dict)
 
