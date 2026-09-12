@@ -1559,11 +1559,28 @@ class ItemsAdderAnalyzer:
                         f"state.auto_state: {auto_state or self.settings.block_auto_state}",
                         spec.get("support", "partial"), spec.get("note", ""))
 
-        for key in ("rotx", "roty", "shift_up", "custom_variants", "placeable_on_water",
+        for key in ("rotx", "roty", "shift_up", "placeable_on_water",
                     "placeable_on_lava", "placeable_on_other_real_wire"):
             if placed_model.get(key) not in (None, False, 0):
                 self.ledger.add(full_id, "block", f"placed_model.{key}", "-", "partial",
                                 "Static model rotation / placement surface needs manual review in CraftEngine.")
+
+        variants = placed_model.get("custom_variants")
+        if isinstance(variants, dict) and variants:
+            # ItemsAdder `custom_variants` is a vanilla-style random model pool
+            # (model / x / y / uvlock / weight): the client picks one at random.
+            # CraftEngine selects a state from `states.properties`, so there is
+            # no property to hang the randomness on and no declarative way to
+            # randomize at placement. Reporting beats inventing a property.
+            models = [str(v.get("model")) for v in variants.values()
+                      if isinstance(v, dict) and v.get("model")]
+            self.ledger.add(
+                full_id, "block", "placed_model.custom_variants", "-", "unsupported",
+                f"{len(variants)} random model variant(s)"
+                + (f" ({', '.join(models[:3])}{'...' if len(models) > 3 else ''})" if models else "")
+                + ". CraftEngine picks a state from `states.properties`, so a random model "
+                  "pool has nothing to bind to; author `states`/`appearances` by hand if you "
+                  "need the variation.")
 
         # --- block settings -------------------------------------------------
         settings: dict[str, Any] = {}

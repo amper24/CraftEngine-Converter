@@ -274,6 +274,14 @@ items:
       block:
         placed_model:
           type: REAL_NOTE
+          custom_variants:
+            variant1:
+              model: "minecraft:block/end_stone_bricks"
+              y: 90
+            variant2:
+              model: "minecraft:block/diamond_block"
+              uvlock: true
+              weight: 2
         hardness: 3.5
         blast_resistance: 9
         light_level: 7

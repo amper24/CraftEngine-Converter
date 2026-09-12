@@ -529,6 +529,40 @@ class ItemsAdderEquipmentAssetTests(unittest.TestCase):
         self.assertIn("none resolved", report)
 
 
+class ItemsAdderCustomVariantsTests(unittest.TestCase):
+    """`placed_model.custom_variants` is a random model pool with no CE binding."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.out = Path(cls.tmp.name) / "converted"
+        settings = Settings()
+        settings.write_conversion_log = False
+        driver.convert(build_fixture(), cls.out, settings=settings, source="itemsadder")
+        cls.report = (cls.out / "reports" / "itemsadder.md").read_text(encoding="utf-8")
+        cls.block = _load(cls.out / "configuration" / "blocks" / NS / "ruby_block.yml")["blocks"][f"{NS}:ruby_block"]
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_reported_as_unsupported_with_the_variant_count(self):
+        self.assertIn("placed_model.custom_variants` | unsupported | 2 random model variant(s)",
+                      self.report)
+
+    def test_report_names_the_source_models(self):
+        self.assertIn("minecraft:block/end_stone_bricks", self.report)
+        self.assertIn("minecraft:block/diamond_block", self.report)
+
+    def test_no_states_are_invented(self):
+        """CraftEngine states need a property; guessing one would be worse than reporting."""
+        self.assertNotIn("states", self.block)
+        self.assertNotIn("custom_variants", str(self.block))
+
+    def test_block_is_still_generated(self):
+        self.assertIn("state", self.block)
+
+
 class ItemsAdderBookTests(unittest.TestCase):
     """`behaviours.book` -> `data.written_book_content`."""
 
