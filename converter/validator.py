@@ -90,6 +90,7 @@ class OutputValidator:
             is_sliceboard = allowed_roots == sliceboard_roots
             if not is_sliceboard:
                 self._validate_nested_keys(path, doc, report)
+                self._validate_required_keys(path, doc, report)
             is_merged = path.name == "all.yml" or path.name == "all.yaml"
             for section, value in doc.items():
                 if isinstance(value, dict):
@@ -111,6 +112,52 @@ class OutputValidator:
                         )
 
         return report
+
+    def _validate_required_keys(self, path: Path, doc: dict[str, Any], report: ValidationResult) -> None:
+        """Flag objects that are missing a key CraftEngine itself requires.
+
+        The allowed-key check above only catches *extra* keys; a config that is
+        missing a mandatory one is equally unloadable, and CraftEngine rejects it
+        at load time rather than degrading gracefully. Only constraints that the
+        bundled schema marks as ``required`` are enforced here, so this stays in
+        step with the target format instead of hard-coding guesses.
+
+        ``furniture.variants`` is the one field the furniture schema marks
+        required — a furniture object without it has nothing to render and no
+        hitbox, so it is an error rather than a warning. ``blocks`` are checked
+        at warning level because a block legitimately carries either ``state``
+        or ``states``, and which one applies is decided by the generator.
+        """
+        rel = str(path.relative_to(self.output_dir)).replace("\\", "/") if getattr(self, "output_dir", None) else str(path)
+        furniture = doc.get("furniture")
+        if isinstance(furniture, dict):
+            for furniture_id, body in furniture.items():
+                if not isinstance(body, dict):
+                    continue
+                variants = body.get("variants")
+                if not isinstance(variants, dict) or not variants:
+                    report.valid = False
+                    report.issues.append(
+                        ValidationIssue(
+                            "error",
+                            rel,
+                            f"furniture {furniture_id}: missing required 'variants' "
+                            f"(CraftEngine needs at least one variant to render)",
+                        )
+                    )
+        blocks = doc.get("blocks")
+        if isinstance(blocks, dict):
+            for block_id, body in blocks.items():
+                if not isinstance(body, dict):
+                    continue
+                if "state" not in body and "states" not in body:
+                    report.issues.append(
+                        ValidationIssue(
+                            "warn",
+                            rel,
+                            f"block {block_id}: has neither 'state' nor 'states'",
+                        )
+                    )
 
     def _validate_nested_keys(self, path: Path, doc: dict[str, Any], report: ValidationResult) -> None:
         """Validate CraftEngine nested keys against the bundled target schema.
