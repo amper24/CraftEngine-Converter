@@ -29,6 +29,26 @@ def _load(path: Path) -> dict:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
+def _ledger_rows(out: Path) -> list[dict]:
+    """Parse the `## Full ledger` table of reports/itemsadder.md.
+
+    Reading the rendered report keeps these tests honest about the artifact a
+    user actually receives, rather than about an in-memory structure.
+    """
+    text = (out / "reports" / "itemsadder.md").read_text(encoding="utf-8")
+    section = text.split("## Full ledger", 1)[1]
+    rows = []
+    for line in section.splitlines():
+        if not line.startswith("|") or line.startswith("| ---") or "Object" in line:
+            continue
+        cells = [c.strip().strip("`") for c in line.strip("|").split("|")]
+        if len(cells) != 4:
+            continue
+        rows.append({"object_id": cells[0], "source_key": cells[1],
+                     "target": cells[2], "support": cells[3]})
+    return rows
+
+
 class ItemsAdderDetectionTests(unittest.TestCase):
     def setUp(self):
         self.pack = build_fixture()
@@ -291,6 +311,184 @@ class ItemsAdderConversionTests(unittest.TestCase):
                     self.assertEqual(unknown, set(), f"{path}: unknown keys under {root}:{object_id}")
                     checked += 1
         self.assertGreater(checked, 8)
+
+
+class ItemsAdderEventTests(unittest.TestCase):
+    """ItemsAdder `events:`/`actions:` -> CraftEngine events DSL."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.pack = build_fixture()
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.out = Path(cls.tmp.name) / "converted"
+        settings = Settings()
+        settings.write_conversion_log = False
+        cls.result = driver.convert(cls.pack, cls.out, settings=settings, source="itemsadder")
+        cls.ledger = _ledger_rows(cls.out)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def setUp(self):
+        path = self.out / "configuration" / "items" / NS / "ruby_sword.yml"
+        self.sword = _load(path)["items"][f"{NS}:ruby_sword"]
+        self.events = {e["on"]: e for e in self.sword.get("events", [])}
+
+    def rows(self, source_key: str, object_id: str | None = None) -> list[tuple]:
+        return [r for r in self.ledger
+                if r["source_key"] == source_key
+                and (object_id is None or r["object_id"] == object_id)]
+
+    def test_direct_trigger_is_converted(self):
+        self.assertIn("attack", self.events)
+
+    def test_trigger_is_renamed_to_the_craftengine_name(self):
+        # IA `interact` has no CE counterpart; `right_click` is the same moment.
+        self.assertIn("right_click", self.events)
+        self.assertNotIn("interact", self.events)
+
+    def test_action_fields_are_renamed(self):
+        fn = [f for f in self.events["attack"]["functions"] if f["type"] == "play_sound"][0]
+        self.assertEqual(fn["sound"], "entity.pig.ambient")
+        self.assertEqual(fn["volume"], 1.5)
+
+    def test_repeated_action_suffix_is_stripped(self):
+        # IA repeats an action as `play_sound_2`; both must survive as functions.
+        sounds = [f for f in self.events["attack"]["functions"] if f["type"] == "play_sound"]
+        self.assertEqual(len(sounds), 2)
+        self.assertEqual(sounds[1]["sound"], "entity.pig.hurt")
+        self.assertEqual(sounds[1]["pitch"], 2)
+
+    def test_target_is_translated_to_the_craftengine_selector(self):
+        fn = [f for f in self.events["attack"]["functions"] if f["type"] == "message"][0]
+        self.assertEqual(fn["message"], "&cHit!")
+        self.assertEqual(fn["target"], "self")  # IA `player` -> CE `self`
+
+    def test_potion_effect_is_a_vanilla_id(self):
+        fn = [f for f in self.events["attack"]["functions"] if f["type"] == "potion_effect"][0]
+        self.assertEqual(fn["potion_effect"], "minecraft:speed")
+        self.assertEqual(fn["duration"], 60)
+        self.assertEqual(fn["amplifier"], 1)
+
+    def test_amount_actions_become_set_count(self):
+        fn = [f for f in self.events["attack"]["functions"] if f["type"] == "set_count"][0]
+        self.assertEqual(fn, {"type": "set_count", "count": 1, "add": True})
+
+    def test_chance_becomes_a_random_condition(self):
+        self.assertEqual(self.events["attack"]["conditions"], [{"type": "random", "value": 0.35}])
+
+    def test_entry_without_a_condition_has_none(self):
+        self.assertNotIn("conditions", self.events["right_click"])
+
+    def test_drop_item_becomes_a_loot_table(self):
+        fn = [f for f in self.events["right_click"]["functions"] if f["type"] == "drop_loot"][0]
+        entry = fn["loot"]["pools"][0]["entries"][0]
+        self.assertEqual(entry["name"], "DIAMOND")
+        self.assertEqual(entry["functions"][0]["count"], 2)
+
+    def test_events_without_a_craftengine_trigger_are_reported_not_emitted(self):
+        self.assertNotIn("wear", self.events)
+        rows = self.rows("events.wear", f"{NS}:ruby_sword")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["support"], "unsupported")
+
+    def test_unsupported_action_is_reported_not_emitted(self):
+        # `veinminer` is covered by the range_mining_item behaviour, not a function.
+        self.assertNotIn("veinminer", [f.get("type") for f in self.events["attack"]["functions"]])
+        self.assertEqual(len(self.rows("events.attack.actions.veinminer")), 1)
+
+    def test_out_of_enum_gui_type_is_never_emitted(self):
+        """An invalid `gui_type` would be a broken config, so it is reported only."""
+        self.assertNotIn("open_window", [f["type"] for f in self.events["right_click"]["functions"]])
+        rows = self.rows("events.interact.actions.open_inventory")
+        self.assertTrue(rows)
+        self.assertEqual(rows[0]["support"], "unsupported")
+
+    def test_inline_cooldown_is_reported(self):
+        rows = self.rows("events.attack.cooldown")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["support"], "unsupported")
+
+    def test_no_silent_drop_of_the_events_key(self):
+        """`events` must be consumed or reported - never silently ignored."""
+        self.assertEqual(self.rows("events", f"{NS}:ruby_sword"), [])
+        self.assertTrue(self.events, "events should have been converted")
+
+
+class ItemsAdderArchiveTests(unittest.TestCase):
+    """The source may be a folder, a zip of that folder, or a zip with a wrapper dir."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.folder = build_fixture()
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.tmp.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_zip_of_the_pack_converts(self):
+        import shutil
+        zip_path = Path(shutil.make_archive(str(self.root / "pack"), "zip", self.folder))
+        out = self.root / "from_zip"
+        result = driver.convert(zip_path, out, settings=Settings(), source="itemsadder")
+        self.assertTrue(result["validation"]["valid"], result["validation"])
+        self.assertEqual(result["fidelity"]["issues"], [])
+        self.assertEqual(result["counts"]["items"], 9)
+
+    def test_zip_with_a_wrapper_directory_is_still_detected(self):
+        import shutil
+        staged = self.root / "MyAwesomePack"
+        if staged.exists():
+            shutil.rmtree(staged)
+        shutil.copytree(self.folder, staged)
+        zip_path = Path(shutil.make_archive(str(self.root / "nested"), "zip", self.root, "MyAwesomePack"))
+        with open_archive(zip_path, Log()) as archive:
+            layout = itemsadder.detect_itemsadder(archive, Log())
+        self.assertIsNotNone(layout)
+        # Detection survives the extra wrapper directory in the archive.
+        self.assertTrue(layout.evidence, layout)
+        self.assertEqual(layout.contents_root, "MyAwesomePack/contents")
+        self.assertEqual(sorted(layout.namespaces), ["decoration", NS])
+        with open_archive(zip_path, Log()) as archive:
+            self.assertEqual(driver.detect_source_kind(archive, Log(), "auto"), "itemsadder")
+
+    def test_zip_output_matches_folder_output(self):
+        import filecmp
+        import shutil
+        zip_path = Path(shutil.make_archive(str(self.root / "pack2"), "zip", self.folder))
+        out_zip = self.root / "out_zip"
+        out_dir = self.root / "out_dir"
+        driver.convert(zip_path, out_zip, settings=Settings(), source="itemsadder")
+        driver.convert(self.folder, out_dir, settings=Settings(), source="itemsadder")
+        # Only the run-scoped artifacts may differ; every generated config must match.
+        diffs = filecmp.dircmp(out_zip, out_dir, ignore=["reports", "manifest.yml", "pack.yml"])
+        self.assertEqual(diffs.diff_files, [])
+        self.assertEqual(diffs.left_only, [])
+        self.assertEqual(diffs.right_only, [])
+
+
+class ItemsAdderSnbtTests(unittest.TestCase):
+    def test_string_nbt_is_parsed_into_components(self):
+        parsed = itemsadder._parse_snbt('{my-tag:"hello", another:"useless"}')
+        self.assertEqual(parsed, {"my-tag": "hello", "another": "useless"})
+
+    def test_nested_components_are_parsed(self):
+        parsed = itemsadder._parse_snbt(
+            '{components:{"minecraft:custom_name":{text:"TEST",italic:false}, '
+            '"minecraft:custom_data":{bro:"asd"}}}')
+        self.assertEqual(parsed["components"]["minecraft:custom_data"], {"bro": "asd"})
+        self.assertIs(parsed["components"]["minecraft:custom_name"]["italic"], False)
+
+    def test_numeric_type_suffixes_are_stripped(self):
+        parsed = itemsadder._parse_snbt("{count:5b, damage:12s, big:1000000l, ratio:1.5f, flag:true}")
+        self.assertEqual(parsed, {"count": 5, "damage": 12, "big": 1000000, "ratio": 1.5, "flag": True})
+
+    def test_malformed_snbt_returns_none_rather_than_guessing(self):
+        for bad in ("{broken:", '{unclosed:"x"', "", "not nbt at all"):
+            self.assertIsNone(itemsadder._parse_snbt(bad), bad)
 
 
 class ItemsAdderSettingsTests(unittest.TestCase):

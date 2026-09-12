@@ -317,6 +317,9 @@ class Generator:
 
         if item.behavior:
             body["behavior"] = _ordered_from(item.behavior)
+        events = getattr(item, "events", None)
+        if events:
+            body["events"] = list(events)
 
         category = self._item_category(item)
         entry = {item.id: dict(body)}

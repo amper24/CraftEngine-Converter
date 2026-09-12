@@ -108,7 +108,15 @@ class App:
         ttk.Button(parent, text="Обзор…", command=command).grid(row=row, column=2, padx=5, pady=4)
 
     def _pick_mod(self) -> None:
-        path = filedialog.askopenfilename(title="Выберите мод (JAR)", filetypes=[("Minecraft mod", "*.jar"), ("Все файлы", "*.*")])
+        path = filedialog.askopenfilename(
+            title="Выберите источник (JAR / ZIP)",
+            filetypes=[
+                ("Мод или ItemsAdder-пак", "*.jar *.zip"),
+                ("Minecraft mod (JAR)", "*.jar"),
+                ("Архив ItemsAdder (ZIP)", "*.zip"),
+                ("Все файлы", "*.*"),
+            ],
+        )
         if not path:
             # ItemsAdder packs and unpacked mods are directories.
             path = filedialog.askdirectory(

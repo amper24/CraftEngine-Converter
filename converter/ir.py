@@ -56,6 +56,8 @@ class ItemNode(BaseNode):
     model: str | None = None
     textures: list[str] = field(default_factory=list)
     behavior: dict[str, Any] | None = None
+    # CraftEngine `events:` DSL entries (list of {on, functions, conditions}).
+    events: list[dict[str, Any]] = field(default_factory=list)
     recipe_references: list[str] = field(default_factory=list)
     tool_tier: str | None = None
     gear_kind: str | None = None
@@ -92,6 +94,7 @@ class ItemNode(BaseNode):
                 "model": self.model,
                 "textures": self.textures,
                 "behavior": self.behavior,
+                "events": self.events,
                 "recipe_references": self.recipe_references,
                 "tool_tier": self.tool_tier,
                 "gear_kind": self.gear_kind,

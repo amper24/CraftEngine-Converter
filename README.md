@@ -109,6 +109,57 @@ ia_emit_consumable_details: true
 выводится распознанная раскладка: namespace'ы, число конфигов и где лежат
 ресурсы.
 
+### Вход: папка или архив
+
+Конвертер принимает любую из трёх форм, и результат одинаков:
+
+- папку `plugins/ItemsAdder/contents/` (или саму `contents/`);
+- ZIP-архив этой папки;
+- ZIP-архив с папкой-обёрткой (`MyAwesomePack/contents/...`) — корень находится сам.
+
+Расширение не важно: архив открывается через `zipfile`, поэтому `.zip` и `.jar`
+идут по одному пути. В GUI фильтр файла предлагает и то, и другое.
+
+### События и действия
+
+`events:` из ItemsAdder переводится в events-DSL CraftEngine
+(`mappings/itemsadder/events.json`). На каждое событие ItemsAdder создаётся
+отдельная запись `on/functions/conditions`, чтобы шанс одного события не
+перетекал на соседнее с тем же триггером.
+
+| ItemsAdder | CraftEngine |
+| --- | --- |
+| `attack` | `attack` |
+| `block_break` / `item_break` | `block_break` / `item_break` |
+| `interact`, `interact_mainhand`, `interact_offhand` | `right_click` |
+| `eat`, `drink` | `consume` |
+| `pickup` | `pick_up` |
+| `chance: 0.35` | условие `random` |
+
+Действия: `message`, `actionbar`, `title`, `execute_commands`, `play_sound`,
+`play_particle`, `potion_effect`, `remove_potion_effect`, `feed`,
+`increment/decrement_amount`, `set_block`, `drop_item`, `place/remove/replace_furniture`,
+`mythic_mobs_skill`, `cancel`, `swing_hand`, `teleport`, `toast`. Повторы вида
+`play_sound_2` разворачиваются, имена эффектов приводятся к ванильным
+(`SPEED` → `minecraft:speed`).
+
+Триггеры без аналога (`wear`, `unwear`, `held`, `drop`, `kill`, `bow_shot`,
+`fishing_*`, `gun_*`, `book_*`, `bucket_*`) и действия без аналога
+(`veinminer`, `script`, `explosion`, `damage_entity`, `feed`-соседи и т.д.)
+**не выбрасываются молча**: каждая такая строка попадает в
+`reports/itemsadder.md` с пояснением, что делать. Недопустимые значения тоже не
+генерируются — например, `open_inventory: my_custom_menu` не станет
+`open_window` с чужеродным `gui_type`, а уйдёт в отчёт.
+
+Встроенный `cooldown` не переносится: в CraftEngine кулдауны именные
+(`set_cooldown` + условие `on_cooldown`), это тоже фиксируется в отчёте.
+
+### Строковый NBT
+
+`nbt:` в строковой форме (`'{my-tag:"hello"}'`) разбирается собственным
+парсером SNBT и раскладывается в `data.components`. То, что парсер не понимает
+полностью, отдаётся человеку через отчёт — догадок не подставляется.
+
 ## Структура
 
 ```text

@@ -167,6 +167,40 @@ items:
     max_stack_size: 1
     glint: false
     fuel: 200
+    events:
+      attack:
+        chance: 0.35
+        cooldown: 20
+        actions:
+          - play_sound:
+              name: entity.pig.ambient
+              volume: 1.5
+          - play_sound_2:
+              name: entity.pig.hurt
+              pitch: 2
+          - message:
+              text: "&cHit!"
+              target: player
+          - potion_effect:
+              type: SPEED
+              duration: 60
+              amplifier: 1
+          - increment_amount:
+              amount: 1
+          - veinminer: true
+      interact:
+        actions:
+          - execute_commands:
+              command: "say hello <player>"
+          - open_inventory:
+              inventory: my_custom_menu
+          - drop_item:
+              item: DIAMOND
+              min_amount: 2
+      wear:
+        actions:
+          - message:
+              text: "Equipped"
 
   ruby_apple:
     display_name: Ruby Apple

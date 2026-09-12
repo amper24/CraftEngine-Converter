@@ -23,6 +23,7 @@ equivalent is written to ``analysis.conversion_ledger`` and ends up in
 from __future__ import annotations
 
 import copy
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -285,6 +286,9 @@ class ItemsAdderAnalyzer:
         self.minecraft_version = minecraft_version
         self.settings = settings or Settings()
         self.ledger = Ledger()
+        # Per-object scratch state; reset at the top of _build_item.
+        self._consumed: set[str] = set()
+        self._current_id: str = ""
 
         attributes = _load_mapping("attributes.json")
         # ItemsAdder accepts camelCase (attackDamage), SCREAMING_SNAKE
@@ -304,6 +308,8 @@ class ItemsAdderAnalyzer:
 
         flags = _load_mapping("item_flags.json").get("flags", {})
         self.item_flags: dict[str, dict[str, Any]] = {k.upper(): v for k, v in flags.items()}
+
+        self._events_table: dict[str, Any] = _load_mapping("events.json")
 
         behaviours_map = _load_mapping("behaviours.json")
         self.behaviour_map: dict[str, dict[str, Any]] = behaviours_map.get("behaviours", {})
@@ -570,6 +576,9 @@ class ItemsAdderAnalyzer:
     ) -> None:
         full_id = f"{ns}:{item_id}"
         source_file = str(raw.get("__source_file__", ""))
+        # Reset per item: the ledger reports anything left unconsumed.
+        self._consumed: set[str] = set()
+        self._current_id: str = full_id
         node = ItemNode(
             id=full_id,
             namespace=ns,
@@ -592,12 +601,16 @@ class ItemsAdderAnalyzer:
 
         # --- identity / display -------------------------------------------
         display = raw.get("display_name", raw.get("name"))
+        if "display_name" in raw or "name" in raw:
+            self._touch("display_name"); self._touch("name")
         resolved_name = self._resolve_text(display)
         if resolved_name:
             node.display_name = resolved_name
             self.ledger.add(full_id, "item", "display_name", "data.item_name", "direct")
 
         lore = raw.get("lore")
+        if "lore" in raw:
+            self._touch("lore")
         if isinstance(lore, list):
             node.lore = [str(self._resolve_text(x) or x) for x in lore]
             self.ledger.add(full_id, "item", "lore", "data.lore", "direct")
@@ -624,10 +637,14 @@ class ItemsAdderAnalyzer:
         self._apply_consumable(node, full_id, raw)
         self._apply_misc(node, full_id, raw)
 
+        # --- events -> CraftEngine events DSL -------------------------------
+        self._apply_events(node, full_id, raw)
+
         # --- armour rendering ------------------------------------------------
         self._apply_armor(node, full_id, raw, armors)
 
         # --- behaviours -> block / furniture / item behaviors ----------------
+        self._touch("behaviours"); self._touch("behaviors"); self._touch("specific_properties")
         behaviours = raw.get("behaviours") if isinstance(raw.get("behaviours"), dict) else {}
         legacy_behaviours = raw.get("behaviors") if isinstance(raw.get("behaviors"), dict) else {}
         behaviours = _deep_merge(legacy_behaviours, behaviours)
@@ -655,6 +672,7 @@ class ItemsAdderAnalyzer:
         exactly that. ``generate: false`` + ``model_path`` means "use my .json
         model", which becomes an explicit ``minecraft:model`` node.
         """
+        self._touch("resource"); self._touch("graphics")
         generate = resource.get("generate", graphics.get("generate", True))
         model_path = resource.get("model_path") or graphics.get("model") or graphics.get("model_path")
         textures = resource.get("textures") or graphics.get("textures") or graphics.get("texture")
@@ -760,6 +778,8 @@ class ItemsAdderAnalyzer:
     # --- attributes --------------------------------------------------------
     def _apply_attributes(self, node: ItemNode, full_id: str, raw: dict[str, Any]) -> None:
         source = raw.get("attribute_modifiers")
+        if "attribute_modifiers" in raw:
+            self._touch("attribute_modifiers")
         if not isinstance(source, dict):
             return
         modifiers: list[dict[str, Any]] = []
@@ -797,6 +817,8 @@ class ItemsAdderAnalyzer:
     # --- durability ---------------------------------------------------------
     def _apply_durability(self, node: ItemNode, full_id: str, raw: dict[str, Any]) -> None:
         source = raw.get("durability")
+        if "durability" in raw:
+            self._touch("durability")
         if isinstance(source, (int, float)):
             node.durability = int(source)
             self.ledger.add(full_id, "item", "durability", "data.max_damage", "direct")
@@ -821,6 +843,8 @@ class ItemsAdderAnalyzer:
     # --- enchants -----------------------------------------------------------
     def _apply_enchants(self, node: ItemNode, full_id: str, raw: dict[str, Any]) -> None:
         enchants = raw.get("enchants")
+        if "enchants" in raw:
+            self._touch("enchants")
         if isinstance(enchants, list):
             table: dict[str, Any] = {}
             for entry in enchants:
@@ -837,6 +861,8 @@ class ItemsAdderAnalyzer:
             self.ledger.add(full_id, "item", "enchants", "data.enchantments", "transform")
 
         blocked = raw.get("blocked_enchants")
+        if "blocked_enchants" in raw:
+            self._touch("blocked_enchants")
         if isinstance(blocked, list) and blocked:
             if any(str(x).upper() == "ALL" for x in blocked):
                 node.settings["enchantable"] = False
@@ -848,6 +874,8 @@ class ItemsAdderAnalyzer:
     # --- item flags ---------------------------------------------------------
     def _apply_item_flags(self, node: ItemNode, full_id: str, raw: dict[str, Any]) -> None:
         flags = raw.get("item_flags")
+        if "item_flags" in raw:
+            self._touch("item_flags")
         if not isinstance(flags, list):
             return
         hidden: list[str] = []
@@ -868,6 +896,8 @@ class ItemsAdderAnalyzer:
     # --- consumable ---------------------------------------------------------
     def _apply_consumable(self, node: ItemNode, full_id: str, raw: dict[str, Any]) -> None:
         source = raw.get("consumable")
+        if "consumable" in raw:
+            self._touch("consumable")
         if isinstance(source, dict):
             food = {"nutrition": _as_int(source.get("nutrition", 0), 0)}
             if source.get("saturation") is not None:
@@ -900,27 +930,232 @@ class ItemsAdderAnalyzer:
                 self.ledger.add(full_id, "item", f"events.{trigger}.feed", "data.food", "transform",
                                 "ItemsAdder applies food through an event; CraftEngine uses the food component.")
 
+    # --- events -> CraftEngine events DSL -----------------------------------
+
+    # Legacy nested shapes consumed by _apply_consumable, not by the DSL path.
+    _LEGACY_EVENT_KEYS = {"eat", "drink", "consume"}
+
+    def _apply_events(self, node: ItemNode, full_id: str, raw: dict[str, Any]) -> None:
+        """Translate ItemsAdder ``events:`` into the CraftEngine events DSL.
+
+        One CraftEngine entry is emitted per ItemsAdder event so that a
+        per-event ``chance`` stays a condition on its own entry instead of
+        leaking onto a sibling that happens to share the same trigger.
+        """
+        events = raw.get("events")
+        if not isinstance(events, dict) or not events:
+            return
+        self._touch("events")
+        table = self._events_table
+        triggers: dict[str, Any] = table["event_triggers"]
+        action_map: dict[str, Any] = table["actions"]
+        gates: dict[str, Any] = table["gate_properties"]
+
+        for ev_name, body in events.items():
+            # Legacy `events.eat.feed` is a food component, handled elsewhere.
+            if ev_name in self._LEGACY_EVENT_KEYS and isinstance(body, dict) and "actions" not in body:
+                continue
+            if not isinstance(body, dict):
+                continue
+            spec = triggers.get(ev_name)
+            if spec is None:
+                self.ledger.add(full_id, "item", f"events.{ev_name}", "-", "unsupported",
+                                "Unknown ItemsAdder event; no CraftEngine trigger registered.")
+                continue
+            on = spec.get("on")
+            if not on:
+                self.ledger.add(full_id, "item", f"events.{ev_name}", "-", "unsupported",
+                                spec.get("note", "No CraftEngine trigger equivalent."))
+                continue
+
+            conditions: list[dict[str, Any]] = []
+            chance = body.get("chance")
+            if chance is not None:
+                gate = gates.get("chance", {})
+                conditions.append({"type": gate.get("condition", "random"),
+                                   gate.get("value_field", "value"): float(chance)})
+                self.ledger.add(full_id, "item", f"events.{ev_name}.chance", "events[].conditions",
+                                "direct", "ItemsAdder chance maps onto the CraftEngine `random` condition.")
+            cooldown = body.get("cooldown")
+            if cooldown is not None:
+                gate = gates.get("cooldown", {})
+                self.ledger.add(full_id, "item", f"events.{ev_name}.cooldown", "-",
+                                gate.get("support", "unsupported"),
+                                gate.get("note", "CraftEngine cooldowns are id-based."))
+
+            functions: list[dict[str, Any]] = []
+            for act in body.get("actions") or []:
+                functions.extend(self._convert_action(full_id, ev_name, act, action_map, table))
+
+            if not functions and not conditions:
+                # Every action was unportable; the rows already say so.
+                continue
+            entry: dict[str, Any] = {"on": on, "functions": functions}
+            if conditions:
+                entry["conditions"] = conditions
+            node.events.append(entry)
+            support = spec.get("support", "transform")
+            self.ledger.add(full_id, "item", f"events.{ev_name}", f"events[on={on}]", support,
+                            spec.get("note", "") or "")
+
+    def _convert_action(self, full_id: str, ev_name: str, act: Any,
+                        action_map: dict[str, Any], table: dict[str, Any]) -> list[dict[str, Any]]:
+        """Convert one ItemsAdder action entry into zero or more CE functions.
+
+        ItemsAdder repeats an action by suffixing its name (``play_sound_2``),
+        so each key is stripped of that suffix before lookup.
+        """
+        if isinstance(act, str):
+            act = {act: True}
+        if not isinstance(act, dict):
+            return []
+        out: list[dict[str, Any]] = []
+        suffix = table.get("action_suffix", r"_\d+$")
+        for name, props in act.items():
+            base = re.sub(suffix, "", name)
+            spec = action_map.get(base)
+            if spec is None:
+                self.ledger.add(full_id, "item", f"events.{ev_name}.actions.{name}", "-", "unsupported",
+                                "Unknown ItemsAdder action; no CraftEngine function registered.")
+                continue
+            ce_type = spec.get("type")
+            if not ce_type:
+                self.ledger.add(full_id, "item", f"events.{ev_name}.actions.{name}", "-",
+                                spec.get("support", "unsupported"),
+                                spec.get("note", "No CraftEngine function equivalent."))
+                continue
+            props = props if isinstance(props, dict) else {}
+            fn: dict[str, Any] = {"type": ce_type}
+            notes: list[str] = []
+            for src, dst in (spec.get("fields") or {}).items():
+                if src not in props:
+                    continue
+                value = props[src]
+                if dst == "target":
+                    mapped = table["targets"].get(str(value).lower())
+                    if mapped is None:
+                        notes.append(f"target `{value}` has no CraftEngine selector and was dropped")
+                        continue
+                    value = mapped
+                fn[dst] = value
+            # Actions needing extra shape beyond a flat field rename.
+            fn, extra = self._finish_function(ce_type, fn, props, ev_name, name, table, notes)
+            if extra is None:
+                continue
+            notes.extend(extra)
+            out.append(fn)
+            support = spec.get("support", "direct")
+            note = spec.get("note", "")
+            if notes:
+                note = (note + " " if note else "") + "; ".join(notes)
+                support = "partial" if support == "direct" else support
+            self.ledger.add(full_id, "item", f"events.{ev_name}.actions.{name}",
+                            f"events[].functions[type={ce_type}]", support, note)
+        return out
+
+    def _potion_id(self, value: str) -> str:
+        """Bukkit PotionType / raw id -> vanilla effect id CraftEngine expects."""
+        value = value.strip()
+        if not value:
+            return value
+        known = self._events_table.get("potion_effects", {})
+        upper = value.upper().replace("minecraft:", "")
+        if upper in known:
+            return known[upper]
+        return value if ":" in value else "minecraft:" + value.lower()
+
+    def _finish_function(self, ce_type: str, fn: dict[str, Any], props: dict[str, Any],
+                         ev_name: str, act_name: str, table: dict[str, Any],
+                         notes: list[str]) -> tuple[dict[str, Any], list[str] | None]:
+        """Apply per-function shaping. Returns ``(fn, None)`` to drop the function."""
+        if ce_type == "set_food":
+            # IA `feed` carries both food and saturation; CE splits them.
+            fn["add"] = True
+            if "food" not in fn:
+                fn["food"] = _as_int(props.get("amount", 0), 0)
+            if props.get("saturation") is not None:
+                fn = {"type": "set_food", **fn}
+                return fn, notes
+            return fn, notes
+        if ce_type == "set_count":
+            amount = _as_int(props.get("amount", 0), 0)
+            fn["add"] = True
+            fn["count"] = -amount if "decrement" in act_name else amount
+            return fn, notes
+        if ce_type == "particle":
+            offsets = props.get("offset")
+            if isinstance(offsets, (list, tuple)) and len(offsets) == 3:
+                fn["offset_x"], fn["offset_y"], fn["offset_z"] = offsets
+            elif isinstance(offsets, (int, float)):
+                fn["offset_x"] = fn["offset_y"] = fn["offset_z"] = offsets
+            return fn, notes
+        if ce_type in ("potion_effect", "remove_potion_effect") and fn.get("potion_effect"):
+            fn["potion_effect"] = self._potion_id(str(fn["potion_effect"]))
+            return fn, notes
+        if ce_type == "open_window":
+            gui = str(fn.get("gui_type") or props.get("inventory") or "").strip().lower()
+            allowed = table.get("open_window_gui_types", [])
+            if gui not in allowed:
+                # Emitting an out-of-enum `gui_type` would be a broken config, so
+                # the intent is reported instead of guessed at.
+                self.ledger.add(
+                    self._current_id, "item", f"events.{ev_name}.actions.{act_name}", "-", "unsupported",
+                    f"CraftEngine `open_window` only accepts {', '.join(allowed)}; "
+                    f"`{gui or '<unset>'}` is a custom menu - re-express it as a `command`.")
+                return fn, None
+            fn["gui_type"] = gui
+            return fn, notes
+        if ce_type == "toast" and "icon" not in fn:
+            return fn, ["CraftEngine `toast` also requires `icon`; add it manually"]
+        if ce_type == "teleport":
+            coords = {k: props.get(k) for k in ("x", "y", "z") if props.get(k) is not None}
+            if len(coords) < 3:
+                return fn, ["CraftEngine `teleport` needs explicit x/y/z; fill them in"]
+            fn.update(coords)
+            for key in ("pitch", "yaw", "world"):
+                if props.get(key) is not None:
+                    fn[key] = props[key]
+            return fn, notes
+        if ce_type == "drop_loot":
+            item_ref = props.get("item")
+            if item_ref:
+                count = _as_int(props.get("min_amount", props.get("amount", 1)), 1)
+                fn["loot"] = {"pools": [{"entries": [{"type": "minecraft:item",
+                                                      "name": str(item_ref),
+                                                      "functions": [
+                                                          {"function": "minecraft:set_count",
+                                                           "count": count}]}]}]}
+                return fn, ["drop position defaults to the event position; review"]
+            return fn, ["no `item` given; CraftEngine `drop_loot` needs a loot table"]
+        return fn, notes
+
     # --- misc ---------------------------------------------------------------
     def _apply_misc(self, node: ItemNode, full_id: str, raw: dict[str, Any]) -> None:
         if raw.get("max_stack_size") is not None:
+            self._touch("max_stack_size")
             node.components["max_stack_size"] = _as_int(raw["max_stack_size"], 64)
             self.ledger.add(full_id, "item", "max_stack_size", "data.components.max_stack_size", "transform")
 
         if raw.get("glint") is not None:
+            self._touch("glint")
             node.components["enchantment_glint_override"] = bool(raw["glint"])
             self.ledger.add(full_id, "item", "glint", "data.components.enchantment_glint_override", "transform")
 
         if raw.get("fuel") is not None:
+            self._touch("fuel")
             ticks = _as_int(raw["fuel"], 0)
             if ticks:
                 node.settings["fuel_time"] = ticks
                 self.ledger.add(full_id, "item", "fuel", "settings.fuel_time", "direct")
 
         if raw.get("tooltip_style"):
+            self._touch("tooltip_style")
             node.components["tooltip_style"] = str(raw["tooltip_style"])
             self.ledger.add(full_id, "item", "tooltip_style", "data.tooltip_style", "direct")
 
         drop = raw.get("drop")
+        if "drop" in raw:
+            self._touch("drop")
         if isinstance(drop, dict):
             glow = drop.get("glow")
             if isinstance(glow, dict) and glow.get("enabled") and glow.get("color"):
@@ -930,10 +1165,51 @@ class ItemsAdderAnalyzer:
                 node.settings["drop_display"] = True
                 self.ledger.add(full_id, "item", "drop.show_name", "settings.drop_display", "direct")
 
+        self._apply_nbt(node, full_id, raw)
+
+    def _apply_nbt(self, node: ItemNode, full_id: str, raw: dict[str, Any]) -> None:
+        """Carry over ``nbt`` (mapping or SNBT string) and ``components_nbt_file``.
+
+        ItemsAdder documents three spellings: a mapping, an inline SNBT string,
+        and a JSON sidecar file. Only the first two can be converted here; the
+        sidecar is reported because the converter never guesses at a file it
+        cannot resolve relative to the source pack.
+        """
         nbt = raw.get("nbt")
+        if "nbt" in raw:
+            self._touch("nbt")
         if isinstance(nbt, dict):
-            node.components.setdefault("raw", {}).update(nbt)
-            self.ledger.add(full_id, "item", "nbt", "data.components", "partial",
+            self._absorb_nbt(node, full_id, nbt, "nbt")
+        elif isinstance(nbt, str) and nbt.strip():
+            parsed = _parse_snbt(nbt)
+            if parsed is None:
+                node.metadata["itemsadder_raw_nbt"] = nbt
+                self.ledger.add(
+                    full_id, "item", "nbt", "-", "partial",
+                    "Inline SNBT string could not be parsed into data components; the raw "
+                    "string is kept in source-map/objects.json for manual conversion.",
+                )
+            else:
+                self._absorb_nbt(node, full_id, parsed, "nbt")
+
+        sidecar = raw.get("components_nbt_file")
+        if sidecar:
+            self._touch("components_nbt_file")
+            node.metadata["itemsadder_components_nbt_file"] = str(sidecar)
+            self.ledger.add(
+                full_id, "item", "components_nbt_file", "-", "partial",
+                "Components come from an external JSON file; merge it into data.components manually.",
+            )
+
+    def _absorb_nbt(self, node: ItemNode, full_id: str, data: dict[str, Any], key: str) -> None:
+        """Merge parsed NBT into the item, unwrapping a `components:` envelope."""
+        if set(data) == {"components"} and isinstance(data["components"], dict):
+            node.components.setdefault("raw", {}).update(data["components"])
+            self.ledger.add(full_id, "item", key, "data.components", "transform",
+                            "The components: envelope was unwrapped into data.components.")
+        else:
+            node.components.setdefault("raw", {}).update(data)
+            self.ledger.add(full_id, "item", key, "data.components", "partial",
                             "Arbitrary NBT is passed through as raw components; review before shipping.")
 
     # --- armour --------------------------------------------------------------
@@ -948,6 +1224,7 @@ class ItemsAdderAnalyzer:
         armor = specific.get("armor")
         if not isinstance(armor, dict):
             return
+        self._touch("specific_properties")
         slot = armor.get("slot")
         ce_slot = self.slots.get(_norm_key(str(slot))) if slot else None
         equippable: dict[str, Any] = {}
@@ -1395,23 +1672,32 @@ class ItemsAdderAnalyzer:
             self.log.info("ItemsAdder datapack recipes collected", count=len(result.recipes))
 
     # --- reporting ---------------------------------------------------------------
+    def _touch(self, key: str) -> None:
+        """Mark a top-level source key as actually consumed.
+
+        The ledger's promise is that no source key disappears without a trace.
+        A static "handled keys" list cannot keep that promise: a key can be
+        listed as handled while the branch that reads it never fires (a string
+        where a mapping was expected, an unsupported value, ...). Tracking real
+        consumption makes silent drops impossible by construction.
+        """
+        self._consumed.add(key)
+
     def _report_unhandled(self, node: ItemNode, full_id: str, raw: dict[str, Any]) -> None:
-        handled = {
-            "display_name", "name", "lore", "resource", "graphics", "attribute_modifiers",
-            "durability", "enchants", "blocked_enchants", "item_flags", "consumable",
-            "max_stack_size", "glint", "fuel", "tooltip_style", "drop", "nbt",
-            "behaviours", "behaviors", "specific_properties", "variant_of", "template",
-            "enabled", "__source_file__",
+        # Keys consumed structurally rather than by an _apply_* helper.
+        structural = {
+            "__source_file__", "enabled", "variant_of", "template",
+            "behaviours", "behaviors", "specific_properties",
         }
         for key in raw:
-            if key in handled:
+            if key in structural or key in self._consumed:
                 continue
             target = self.item_key_map.get(str(key), "REPORT")
             support = "unsupported" if target == "REPORT" else "partial"
             self.ledger.add(
                 full_id, "item", key, "-" if target == "REPORT" else target, support,
                 "No CraftEngine equivalent; kept in source-map only." if target == "REPORT"
-                else "Partially representable; review the generated config.",
+                else "Present in the source but not fully representable; review the generated config.",
             )
 
 
@@ -1420,6 +1706,161 @@ class ItemsAdderAnalyzer:
 def _norm_key(name: str) -> str:
     """Collapse camelCase / SCREAMING_SNAKE / snake_case onto one lookup key."""
     return name.replace("_", "").replace("-", "").lower()
+
+
+class _SnbtError(ValueError):
+    pass
+
+
+def _parse_snbt(text: str) -> dict[str, Any] | None:
+    """Parse the SNBT subset ItemsAdder uses in ``nbt:`` strings.
+
+    Deliberately conservative: anything outside compounds, lists, quoted
+    strings, numbers and booleans raises, and the caller then reports the key
+    instead of emitting a half-parsed guess. Returning ``None`` is the signal
+    for "needs a human".
+    """
+    parser = _SnbtParser(text)
+    try:
+        value = parser.parse_compound()
+        parser.skip_ws()
+        if not parser.eof():
+            return None
+        return value if isinstance(value, dict) else None
+    except _SnbtError:
+        return None
+
+
+class _SnbtParser:
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self.pos = 0
+
+    def eof(self) -> bool:
+        return self.pos >= len(self.text)
+
+    def skip_ws(self) -> None:
+        while not self.eof() and self.text[self.pos] in " \t\r\n":
+            self.pos += 1
+
+    def expect(self, char: str) -> None:
+        self.skip_ws()
+        if self.eof() or self.text[self.pos] != char:
+            raise _SnbtError(f"expected {char!r} at {self.pos}")
+        self.pos += 1
+
+    def parse_compound(self) -> dict[str, Any]:
+        self.expect("{")
+        out: dict[str, Any] = {}
+        self.skip_ws()
+        if not self.eof() and self.text[self.pos] == "}":
+            self.pos += 1
+            return out
+        while True:
+            key = self.parse_key()
+            self.expect(":")
+            out[key] = self.parse_value()
+            self.skip_ws()
+            if self.eof():
+                raise _SnbtError("unterminated compound")
+            char = self.text[self.pos]
+            if char == ",":
+                self.pos += 1
+                self.skip_ws()
+                # A trailing comma before } is tolerated.
+                if not self.eof() and self.text[self.pos] == "}":
+                    self.pos += 1
+                    return out
+                continue
+            if char == "}":
+                self.pos += 1
+                return out
+            raise _SnbtError(f"unexpected {char!r} at {self.pos}")
+
+    def parse_key(self) -> str:
+        self.skip_ws()
+        if self.eof():
+            raise _SnbtError("missing key")
+        if self.text[self.pos] in "\"'":
+            return str(self.parse_quoted())
+        start = self.pos
+        while not self.eof() and (self.text[self.pos].isalnum() or self.text[self.pos] in "._-+/"):
+            self.pos += 1
+        if start == self.pos:
+            raise _SnbtError(f"invalid key at {self.pos}")
+        return self.text[start:self.pos]
+
+    def parse_value(self) -> Any:
+        self.skip_ws()
+        if self.eof():
+            raise _SnbtError("missing value")
+        char = self.text[self.pos]
+        if char == "{":
+            return self.parse_compound()
+        if char == "[":
+            return self.parse_list()
+        if char in "\"'":
+            return self.parse_quoted()
+        return self.parse_primitive()
+
+    def parse_list(self) -> list[Any]:
+        self.expect("[")
+        items: list[Any] = []
+        self.skip_ws()
+        if not self.eof() and self.text[self.pos] == "]":
+            self.pos += 1
+            return items
+        while True:
+            items.append(self.parse_value())
+            self.skip_ws()
+            if self.eof():
+                raise _SnbtError("unterminated list")
+            char = self.text[self.pos]
+            if char == ",":
+                self.pos += 1
+                continue
+            if char == "]":
+                self.pos += 1
+                return items
+            raise _SnbtError(f"unexpected {char!r} at {self.pos}")
+
+    def parse_quoted(self) -> str:
+        quote = self.text[self.pos]
+        self.pos += 1
+        out: list[str] = []
+        while not self.eof():
+            char = self.text[self.pos]
+            if char == "\\" and self.pos + 1 < len(self.text):
+                nxt = self.text[self.pos + 1]
+                out.append({"n": "\n", "t": "\t", "r": "\r", '"': '"', "'": "'", "\\": "\\"}.get(nxt, nxt))
+                self.pos += 2
+                continue
+            if char == quote:
+                self.pos += 1
+                return "".join(out)
+            out.append(char)
+            self.pos += 1
+        raise _SnbtError("unterminated string")
+
+    def parse_primitive(self) -> Any:
+        start = self.pos
+        while not self.eof() and self.text[self.pos] not in ",}]":
+            self.pos += 1
+        token = self.text[start:self.pos].strip()
+        if not token:
+            raise _SnbtError("empty value")
+        lowered = token.lower()
+        if lowered in ("true", "false"):
+            return lowered == "true"
+        # Numeric type suffixes (1b, 2s, 3l, 4f, 5d) are stripped: the value is
+        # what matters for a YAML data component.
+        body = token[:-1] if len(token) > 1 and token[-1].lower() in "bslfd" else token
+        try:
+            if any(c in body for c in ".eE"):
+                return float(body)
+            return int(body)
+        except ValueError:
+            raise _SnbtError(f"cannot parse {token!r}") from None
 
 
 def _mc_locale(code: str) -> str:
