@@ -323,6 +323,19 @@ armors_rendering:
     color: "#d60000"
     layer_1: armor/rubyarmor/layer_1
     layer_2: armor/rubyarmor/layer_2
+
+sounds:
+  ruby_chime:
+    path: misc
+    settings:
+      subtitle: subtitles.rubbishpack.ruby_chime
+  ruby_thud:
+    settings: {{}}
+
+entities:
+  ruby_golem:
+    display_name: Ruby Golem
+    type: IRON_GOLEM
 """
 
 DECOR_ITEMS_YML = f"""info:
@@ -391,6 +404,10 @@ def build() -> Path:
     # armors_rendering layer textures (IA keeps them wherever it likes).
     _png(ns_root / "textures" / "armor" / "rubyarmor" / "layer_1.png")
     _png(ns_root / "textures" / "armor" / "rubyarmor" / "layer_2.png")
+    (ns_root / "sounds" / "misc").mkdir(parents=True, exist_ok=True)
+    (ns_root / "sounds").mkdir(parents=True, exist_ok=True)
+    (ns_root / "sounds" / "misc" / "ruby_chime.ogg").write_bytes(b"OggS")
+    (ns_root / "sounds" / "ruby_thud.ogg").write_bytes(b"OggS")
     _write_json(ns_root / "models" / "item" / "ruby_pickaxe.json", SWORD_MODEL)
     _write_json(ns_root / "models" / "block" / "ruby_block.json", BLOCK_MODEL)
     _write_json(ns_root / "models" / "ruby_lamp.json", LAMP_MODEL)

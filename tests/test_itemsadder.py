@@ -63,7 +63,10 @@ class ItemsAdderDetectionTests(unittest.TestCase):
     def test_both_resource_layouts_are_found(self):
         with open_archive(self.pack, Log()) as archive:
             layout = itemsadder.detect_itemsadder(archive, Log())
-        self.assertEqual(sorted(layout.namespaces[NS].legacy_asset_dirs), ["models", "textures"])
+        # `sounds` joined the legacy asset dirs when the fixture grew a
+        # contents/<ns>/sounds/ tree for the sound registry.
+        self.assertEqual(sorted(layout.namespaces[NS].legacy_asset_dirs),
+                         ["models", "sounds", "textures"])
         self.assertEqual(
             layout.namespaces["decoration"].resourcepack_roots,
             ["contents/decoration/resources/resourcepack"],
@@ -524,6 +527,53 @@ class ItemsAdderEquipmentAssetTests(unittest.TestCase):
         self.assertFalse((out / "resourcepack" / "assets" / NS / "equipment" / "rubyarmor.json").exists())
         report = (out / "reports" / "itemsadder.md").read_text(encoding="utf-8")
         self.assertIn("none resolved", report)
+
+
+class ItemsAdderRootKeyTests(unittest.TestCase):
+    """Sound registry generation and reporting of root keys with no CE equivalent."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.pack = build_fixture()
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.out = Path(cls.tmp.name) / "converted"
+        settings = Settings()
+        settings.write_conversion_log = False
+        driver.convert(cls.pack, cls.out, settings=settings, source="itemsadder")
+        cls.report = (cls.out / "reports" / "itemsadder.md").read_text(encoding="utf-8")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_sound_registry_is_generated(self):
+        """Without sounds.json the .ogg files are not addressable at all."""
+        import json
+        path = self.out / "resourcepack" / "assets" / NS / "sounds.json"
+        self.assertTrue(path.exists())
+        reg = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(reg["ruby_chime"]["sounds"], [f"{NS}:misc/ruby_chime"])
+        self.assertEqual(reg["ruby_chime"]["subtitle"], f"subtitles.{NS}.ruby_chime")
+
+    def test_sound_without_a_subfolder_uses_its_own_name(self):
+        import json
+        reg = json.loads((self.out / "resourcepack" / "assets" / NS / "sounds.json")
+                         .read_text(encoding="utf-8"))
+        self.assertEqual(reg["ruby_thud"]["sounds"], [f"{NS}:ruby_thud"])
+        self.assertNotIn("subtitle", reg["ruby_thud"])
+
+    def test_sound_files_are_copied_next_to_the_registry(self):
+        base = self.out / "resourcepack" / "assets" / NS / "sounds"
+        self.assertTrue((base / "misc" / "ruby_chime.ogg").exists())
+        self.assertTrue((base / "ruby_thud.ogg").exists())
+
+    def test_unsupported_root_key_is_reported(self):
+        self.assertIn(f"{NS}:<root>` | `entities`", self.report)
+        self.assertIn("not converted", self.report)
+
+    def test_handled_root_keys_are_not_reported_as_unsupported(self):
+        for key in ("items", "categories", "armors_rendering", "sounds"):
+            self.assertNotIn(f"<root>` | `{key}`", self.report)
 
 
 class ItemsAdderSnbtTests(unittest.TestCase):

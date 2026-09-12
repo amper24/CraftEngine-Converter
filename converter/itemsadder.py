@@ -368,6 +368,8 @@ class ItemsAdderAnalyzer:
         # Needs the built items (they carry the armor_rendering metadata), so it
         # runs after every namespace has been processed.
         self._emit_equipment_assets(result)
+        self._emit_sound_registry(result)
+        self._report_root_keys(result)
         self._collect_datapack_recipes(result)
         self._link_block_items(result)
         self._link_loot(result)
@@ -420,6 +422,89 @@ class ItemsAdderAnalyzer:
         if text.startswith("display-name-") or text.startswith("lore-") or text.startswith("display-category-"):
             return table.get(text, text)
         return text
+
+    # --- sound registry ---------------------------------------------------
+    def _emit_sound_registry(self, result: AnalysisResult) -> None:
+        """Turn an IA ``sounds:`` root map into ``assets/<ns>/sounds.json``.
+
+        ItemsAdder registers sound events from the ``sounds:`` key; the .ogg
+        files alone are not enough - without the vanilla ``sounds.json`` the id
+        referenced by block/furniture ``sounds`` settings resolves to nothing.
+        """
+        per_ns: dict[str, dict[str, Any]] = {}
+        for ns, documents in self._documents.items():
+            for name, data in documents:
+                if not isinstance(data, dict):
+                    continue
+                sounds = data.get("sounds")
+                if not isinstance(sounds, dict):
+                    continue
+                bucket = per_ns.setdefault(ns, {})
+                for sound_id, body in sounds.items():
+                    if not isinstance(body, dict):
+                        continue
+                    sub = ((body.get("settings") or {}).get("subtitle")
+                           if isinstance(body.get("settings"), dict) else None)
+                    sub_path = body.get("path") or ""
+                    entry = {
+                        "sounds": [f"{ns}:{str(sub_path).strip('/')}/{sound_id}".replace("//", "/")
+                                   if sub_path else f"{ns}:{sound_id}"],
+                    }
+                    if sub:
+                        entry["subtitle"] = str(sub)
+                    bucket[str(sound_id)] = entry
+                    self.ledger.add(f"{ns}:{sound_id}", "pack", "sounds", "sounds.json", "direct",
+                                    f"Registered as a vanilla sound event (from {name}).")
+        for ns, entries in per_ns.items():
+            result.generated_assets[f"assets/{ns}/sounds.json"] = (
+                json.dumps(entries, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
+        if per_ns:
+            self.log.info("ItemsAdder sound registry generated", namespaces=len(per_ns))
+
+    # --- root keys with no CraftEngine equivalent -------------------------
+    # Root keys whose content this adapter actually consumes.
+    _HANDLED_ROOT_KEYS = {"items", "categories", "lang", "armors_rendering", "recipes", "info", "sounds"}
+    # Root keys that are real ItemsAdder content but have no CraftEngine
+    # counterpart. Reported once per namespace so the user knows what did not
+    # travel, instead of finding out in game.
+    _UNSUPPORTED_ROOT_KEYS = {
+        "entities": "Custom entities are a separate CraftEngine domain and are not converted.",
+        "liquids": "CraftEngine has no custom-liquid configuration.",
+        "hud": "CraftEngine has no HUD element configuration.",
+        "emotes": "CraftEngine has no emote system.",
+        "biomes": "CraftEngine does not define biomes; keep them in a datapack.",
+        "world_populators": "World generation belongs in a datapack, not CraftEngine.",
+        "paintings": "CraftEngine has no painting configuration.",
+        "books": "Convert to `written_book_content` per item by hand; there is no book registry in CraftEngine.",
+        "music_discs": "Handled per item via `data.jukebox_playable`, not as a root registry.",
+        "trims": "Armor trims are vanilla data; CraftEngine does not register them.",
+        "fonts": "Fonts are plain resourcepack assets; CraftEngine does not own them.",
+        "blocks": "Blocks are ItemsAdder items with `behaviours.block`; a root `blocks` map is not read.",
+        "furnitures": "Furniture are ItemsAdder items with `behaviours.furniture`; a root map is not read.",
+    }
+
+    def _report_root_keys(self, result: AnalysisResult) -> None:
+        """Report IA root keys that carry content this adapter does not read.
+
+        Without this, a pack shipping ``entities:`` or ``liquids:`` looks fully
+        converted while whole sections never left the source.
+        """
+        reported: set[tuple[str, str]] = set()
+        for ns, documents in self._documents.items():
+            for name, data in documents:
+                if not isinstance(data, dict):
+                    continue
+                for key in data:
+                    if key in self._HANDLED_ROOT_KEYS:
+                        continue
+                    if (ns, key) in reported:
+                        continue
+                    reported.add((ns, key))
+                    note = self._UNSUPPORTED_ROOT_KEYS.get(str(key))
+                    if note is None:
+                        note = "Unknown ItemsAdder root key; not read by this converter."
+                    self.ledger.add(f"{ns}:<root>", "pack", str(key), "-", "unsupported",
+                                    f"{note} (from {name})")
 
     # --- armor equipment assets -------------------------------------------
     # Vanilla resolves an equipment layer texture `<ns>:<path>` to
