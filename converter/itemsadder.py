@@ -1793,6 +1793,24 @@ class ItemsAdderAnalyzer:
                 self.ledger.add(full_id, "furniture", key, "-", "partial",
                                 "No direct CraftEngine furniture field; review manually.")
 
+        # Catch-all: `behaviours.furniture` is a nested map, so the item-level
+        # unknown-key sweep never sees inside it. Without this, anything the
+        # code above does not read - armor-stand pose fields such as
+        # head_rotation/body_rotation/left_arm_rotation, and anything a future
+        # ItemsAdder adds - vanishes with no ledger row at all.
+        handled_furniture_keys = {
+            "entity", "display_transformation", "hitbox", "solid", "placeable_on",
+            "light_level", "sound", "small", "fixed_rotation", "auto_update_in_world",
+            "render_size", "sit",
+        }
+        for key in sorted(set(cfg) - handled_furniture_keys):
+            furniture.unmapped[str(key)] = cfg[key]
+            self.ledger.add(
+                full_id, "furniture", f"behaviours.furniture.{key}", "-", "unsupported",
+                "No CraftEngine furniture field reads this; kept in the source map only. "
+                "Armor-stand pose fields have no equivalent because CraftEngine renders "
+                "furniture as a display element, not a posed armor stand.")
+
         furniture.status = status.ANALYZED
         result.furniture[full_id] = furniture
         node.behavior = {"type": "furniture_item", "furniture": full_id}

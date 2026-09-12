@@ -342,6 +342,10 @@ items:
       furniture:
         entity: item_display
         light_level: 13
+        head_rotation:
+          x: 20
+        body_rotation:
+          y: 90
         solid: true
         placeable_on:
           floor: true

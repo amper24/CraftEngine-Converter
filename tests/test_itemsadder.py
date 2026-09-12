@@ -571,6 +571,42 @@ class ItemsAdderFurnitureSitTests(unittest.TestCase):
         self.assertEqual(item["behavior"]["furniture"], f"{NS}:ruby_cushion")
 
 
+class ItemsAdderFurnitureUnknownKeyTests(unittest.TestCase):
+    """Nothing inside `behaviours.furniture` may vanish without a ledger row."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.out = Path(cls.tmp.name) / "converted"
+        settings = Settings()
+        settings.write_conversion_log = False
+        driver.convert(build_fixture(), cls.out, settings=settings, source="itemsadder")
+        cls.report = (cls.out / "reports" / "itemsadder.md").read_text(encoding="utf-8")
+        cls.furn = _load(cls.out / "configuration" / "furniture" / NS / "ruby_lamp.yml")[
+            "furniture"][f"{NS}:ruby_lamp"]
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_armor_stand_pose_fields_are_reported(self):
+        """CE renders furniture as a display element, not a posed armor stand."""
+        for key in ("head_rotation", "body_rotation"):
+            self.assertIn(f"behaviours.furniture.{key}", self.report, key)
+
+    def test_pose_fields_are_not_invented_into_the_output(self):
+        body = str(self.furn)
+        self.assertNotIn("head_rotation", body)
+        self.assertNotIn("body_rotation", body)
+
+    def test_handled_furniture_keys_are_not_flagged(self):
+        for key in ("entity", "hitbox", "light_level", "solid", "placeable_on"):
+            self.assertNotIn(f"behaviours.furniture.{key}", self.report)
+
+    def test_furniture_is_still_generated(self):
+        self.assertIn("ground", self.furn["variants"])
+
+
 class ItemsAdderCustomVariantsTests(unittest.TestCase):
     """`placed_model.custom_variants` is a random model pool with no CE binding."""
 
